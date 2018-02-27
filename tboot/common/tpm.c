@@ -48,6 +48,7 @@
 #include <e820.h>
 #include <tpm.h>
 #include <sha1.h>
+#include <efi_memmap.h>
 
 __data uint8_t g_tpm_ver = TPM_VER_UNKNOWN;
 __data struct tpm_if g_tpm = {
