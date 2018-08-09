@@ -697,6 +697,29 @@ bool e820_get_highest_sized_ram(uint64_t size, uint64_t limit,
 }
 
 
+/* locate the RAM region that addr is in (first, if there are overlaps) */
+bool get_ram_region(uint64_t addr, uint64_t *ram_base, uint64_t *ram_size)
+{
+    if ( ram_base == NULL || ram_size == NULL )
+        return false;
+
+    for ( unsigned int i = 0; i < g_nr_map; i++ ) {
+        memory_map_t *entry = &g_copy_e820_map[i];
+
+        if ( entry->type == E820_RAM ) {
+            uint64_t base = e820_base_64(entry);
+            uint64_t size = e820_length_64(entry);
+            if ( addr >= base && addr < (base + size) ) {
+                *ram_base = base;
+                *ram_size = size;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 /*
  * Local variables:
  * mode: C

@@ -195,6 +195,9 @@ static void post_launch(void)
     /* remove all TXT sinit acm modules before verifying modules */
     remove_txt_modules(g_ldr_ctx);
 
+    /* adjust the MBI, move any modules that were in RAM */
+    adjust_modules(g_ldr_ctx);
+
     /*
      * verify e820 table and adjust it to protect our memory regions
      */
