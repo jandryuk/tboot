@@ -215,12 +215,6 @@ static void post_launch(void)
         if ( !e820_protect_region(base, size, E820_RESERVED) )         apply_policy(TB_ERR_FATAL);
     }
 
-    /* replace map in loader context with copy */
-    replace_e820_map(g_ldr_ctx);
-
-    printk(TBOOT_DETA"adjusted e820 map:\n");
-    print_e820_map();
-
     /*
      * verify modules against policy
      */
@@ -257,6 +251,17 @@ static void post_launch(void)
     else if ( get_tboot_mwait() ) {
         printk(TBOOT_ERR"ap_wake_mwait specified but the CPU doesn't support it.\n");
     }
+
+    /*
+     * export tpm event log
+     */
+    export_evtlog(&_tboot_shared.evt_log_region, &_tboot_shared.evt_log_size);
+
+    /* replace map in loader context with copy */
+    replace_e820_map(g_ldr_ctx);
+
+    printk(TBOOT_DETA"adjusted e820 map:\n");
+    print_e820_map();
 
     print_tboot_shared(&_tboot_shared);
 
