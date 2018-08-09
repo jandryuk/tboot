@@ -2108,6 +2108,183 @@ void determine_loader_type(void *addr, uint32_t magic)
      */
 }
 
+static bool overlapped_ranges(uint32_t r1_start, uint32_t r1_end,
+                              uint32_t r2_start, uint32_t r2_end)
+{
+    if ( (r1_start >= r2_start && r1_start <= r2_end) ||
+         (r1_end >= r2_start && r1_end <= r2_end) ||
+         (r2_start >= r1_start && r2_start <= r1_end) ||
+         (r2_end >= r1_start && r2_end <= r1_end) )
+        return true;
+
+    return false;
+}
+
+static uint32_t location_available(multiboot_info_t *mbi, uint32_t location,
+                                   uint32_t length)
+{
+    static uint32_t mbi_end = 0;
+    module_t *m;
+
+    if ( mbi_end == 0 )
+        mbi_end = (uint32_t)get_mbi_mem_end_mb1(mbi);
+
+    /* first, is the MBI at this location? */
+    if ( overlapped_ranges(location, (location + length),
+                           (uint32_t)mbi, mbi_end) ) {
+        return (uint32_t)PAGE_UP((uint8_t*)mbi_end + 1);
+    }
+
+    /* next check if another module is sitting there */
+    for ( unsigned int i = 0; i < mbi->mods_count; i++ ) {
+        m = (module_t *)(mbi->mods_addr + i*sizeof(module_t));
+        if ( overlapped_ranges(location, (location + length),
+                               m->mod_start, m->mod_end) ) {
+            return (uint32_t)PAGE_UP((uint8_t*)m->mod_end + 1);
+        }
+    }
+
+    /* available location, return the location itself */
+    return location;
+}
+
+/*
+ * Attempt to move the module into a valid RAM area near other
+ * modules.
+ */
+static bool adjust_module_location(multiboot_info_t *mbi, module_t *m)
+{
+    uint32_t location = (uint32_t)PAGE_UP(get_tboot_mem_end());
+    uint32_t next;
+    uint32_t size = (m->mod_end - m->mod_start);
+    uint64_t ram_base = 0, ram_size = 0, top;
+
+    /* find the extent of the RAM area where tboot lives */
+    if ( !get_ram_region(location, &ram_base, &ram_size) ) {
+        printk("ram range for TBOOT module not found: failure");
+        return false;
+    }
+    top = ram_base + ram_size;
+
+    if ( top < TBOOT_BASE_ADDR || top > 0x100000000ULL ) {
+        printk("ram extent for TBOOT module invalid: %Lx", top);
+        return false;
+    }
+
+    while ( location < top ) {
+        next = location_available(mbi, location, size);
+        if ( next == location ) {
+            printk("module moved from %x to %x\n", m->mod_start, location);
+            tb_memcpy((void *)location, (void *)m->mod_start, size);
+            m->mod_start = location;
+            m->mod_end = location + size;
+            return true;
+        }
+
+        location = next;
+    }
+
+    return false;
+}
+
+/*
+ * Check if the module was in a valid RAM area in the original
+ * MBI mmap before it was adjusted.
+ */
+static bool mmap_check_region(uint64_t base, uint64_t length,
+                              multiboot_info_t *mbi)
+{
+    uint32_t entry_offset = 0;
+    uint64_t ebase, elength;
+
+    /* Only deal with MBIs that have MEMMAPs */
+    if ( (mbi->flags & MBI_MEMMAP) == 0 )
+        return false;
+
+    while ( entry_offset < mbi->mmap_length ) {
+        memory_map_t *entry = (memory_map_t *)(mbi->mmap_addr + entry_offset);
+        ebase = ((uint64_t)entry->base_addr_high << 32) |
+                 (uint64_t)entry->base_addr_low;
+        elength = ((uint64_t)entry->length_high << 32) |
+                 (uint64_t)entry->length_low;
+
+        if ( base >= ebase && length <= elength ) {
+            if ( entry->type == E820_RAM )
+                return true;
+            else
+                return false;
+        }
+
+        entry_offset += entry->size + sizeof(entry->size);
+    }
+
+    return false;
+}
+
+/*
+ * It has been found that GRUB2 will build its heap from all the RAM
+ * regions < 4G found in the memory map. This means that sometimes GRUB2
+ * will locate one or more modules in higher memory regions that are above
+ * RESERVED regions. The PMR protection logic can cause these high RAM
+ * regions to be remapped from RAM->RESERVED thus leaving the module in
+ * an invalid region and causing the verify_modules() call to fail etc.
+ *
+ * This fix attempts to locate such modules and move them down into
+ * the RAM area inhabited by TBOOT itself (and safely into the region that
+ * will be PMR protected).
+ *
+ * TODO a more complete fix that could be upstreamed will attempt to always
+ * moved the MBI and modules to locations just above TBOOT to provide a
+ * more consistent environment and to prevent future issues with boot
+ * loaders.
+ */
+void adjust_modules(loader_ctx *lctx)
+{
+    uint64_t base, size;
+    module_t *m;
+    uint32_t type;
+    multiboot_info_t *mbi;
+
+    /*
+     * TODO Currently only doing this for multiboot1. When we support UEFI
+     * or when we make a proper upstream patch, this should support
+     * multiboot2.
+     */
+    if ( lctx->type != MB1_ONLY )
+        return;
+
+    mbi = (multiboot_info_t *) lctx->addr;
+
+    printk("check for module location adjustments.\n");
+
+    for ( unsigned int i = 0; i < mbi->mods_count; i++ ) {
+        m = (module_t *)(mbi->mods_addr + i*sizeof(module_t));
+        base = m->mod_start;
+        size = m->mod_end - m->mod_start;
+        type = e820_check_region(base, size);
+        if ( type == E820_RAM )
+            continue;
+
+        printk("adjust module %d of mbi (%Lx - %Lx) in e820 table\n\t",
+               i, base, (base + size - 1));
+        if ( type != E820_RESERVED ) {
+            printk(": failed, current memory region invalid - type %d\n",
+                   (int)type);
+            return;
+        }
+
+        if ( !mmap_check_region(base, size, mbi) ) {
+            printk(": failed, original memory region invalid.\n");
+            return;
+        }
+
+        if ( !adjust_module_location(mbi, m) ) {
+            printk(": failed, could not adjust location\n");
+            return;
+        }
+    }
+}
+
 /*
  * Local variables:
  * mode: C
