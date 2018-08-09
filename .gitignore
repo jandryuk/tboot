@@ -1,0 +1,86 @@
+## C
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+## Misc
+# lds file.
+tboot/common/tboot.lds
+# Binary.
+tboot/tboot
+# Compressed binary.
+tboot/tboot.gz
+# Debug symbols.
+tboot/tboot-syms
+# Cscopes
+cscope.out
+cscope.files
+# Lcptools
+lcptools/lcp_crtpconf
+lcptools/lcp_crtpol
+lcptools/lcp_mlehash
+lcptools/lcp_readpol
+lcptools/lcp_writepol
+lcptools/tpmnv_defindex
+lcptools/tpmnv_getcap
+lcptools/tpmnv_lock
+lcptools/tpmnv_relindex
+lcptools/trousers_dep
+# Lcptools-v2
+lcptools-v2/lcp2_crtpol
+lcptools-v2/lcp2_crtpolelt
+lcptools-v2/lcp2_crtpollist
+lcptools-v2/lcp2_mlehash
+lcptools-v2/trousers_dep
+lcptools/lcp_crtpol2
+lcptools/lcp_crtpolelt
+lcptools/lcp_crtpollist
+# pcr-calc
+pcr-calc/module_hash
+pcr-calc/pcr-calc
+# tb_polgen
+tb_polgen/tb_polgen
+# utils
+utils/acminfo
+utils/parse_err
+utils/txt-stat
