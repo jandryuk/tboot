@@ -65,61 +65,92 @@
 extern void shutdown(void);
 extern void s3_launch(void);
 
+extern void vga_puts(const char *s, unsigned int cnt);
+
 /* MLE/kernel shared data page (in boot.S) */
 extern tboot_shared_t _tboot_shared;
 
 extern long s3_flag;
 
+const char *warning_msg = "An error had occurred on this launch or the "
+                          "previous.";
+#define WARN_DELAY  0     /* in sec */
+
 /*
  * policy actions
  */
 typedef enum {
-    TB_POLACT_CONTINUE,
-    TB_POLACT_UNMEASURED_LAUNCH,
-    TB_POLACT_HALT,
+    TB_POLACT_IGNORE,               /* continue execution (don't log error) */
+    TB_POLACT_CONTINUE,             /* log error and continue execution */
+    TB_POLACT_UNMEASURED_LAUNCH,    /* don't complete measured launch but
+                                       skip to launch of kernel/VMM */
+    TB_POLACT_HALT,                 /* halt system */
+    TB_POLACT_REBOOT,               /* reboot */
+    TB_POLACT_WARN,                 /* display message on VGA and wait 5 sec.
+                                       then continue */
 } tb_policy_action_t;
+
+/* # actions that can be specified for each error condition */
+#define MAX_ACTIONS     2
 
 /* policy map types */
 typedef struct {
     tb_error_t         error;
-    tb_policy_action_t action;
+    tb_policy_action_t pre_actions[MAX_ACTIONS];
+    tb_policy_action_t post_actions[MAX_ACTIONS];
 } tb_policy_map_entry_t;
 
 typedef struct {
     uint8_t                policy_type;
-    tb_policy_action_t     default_action;
+    tb_policy_action_t     default_pre_actions[MAX_ACTIONS];
+    tb_policy_action_t     default_post_actions[MAX_ACTIONS];
+                           /* must have TB_ERR_NONE as last entry in these
+                            * and its actions will be ignored */
     tb_policy_map_entry_t  exception_action_table[TB_ERR_MAX];
-                           /* have TB_ERR_NONE as last entry */
 } tb_policy_map_t;
 
-/* map */
+/*
+ * map of policy types to actions
+ *
+ * TB_ERR_FATAL should never map to TB_POLACT_CONTINUE or TB_POLACT_IGNORE
+ * because tboot code assumes that this error cannot return to the caller
+ */
 static const tb_policy_map_t g_policy_map[] = {
-    { TB_POLTYPE_CONT_NON_FATAL,               TB_POLACT_CONTINUE,
+    { TB_POLTYPE_CONT_NON_FATAL,               {TB_POLACT_CONTINUE}, {TB_POLACT_CONTINUE},
       {
-          {TB_ERR_FATAL,                       TB_POLACT_HALT},
-          {TB_ERR_TPM_NOT_READY,               TB_POLACT_UNMEASURED_LAUNCH},
-          {TB_ERR_SMX_NOT_SUPPORTED,           TB_POLACT_UNMEASURED_LAUNCH},
-          {TB_ERR_VMX_NOT_SUPPORTED,           TB_POLACT_UNMEASURED_LAUNCH},
-          {TB_ERR_TXT_NOT_SUPPORTED,           TB_POLACT_UNMEASURED_LAUNCH},
-          {TB_ERR_SINIT_NOT_PRESENT,           TB_POLACT_UNMEASURED_LAUNCH},
-          {TB_ERR_ACMOD_VERIFY_FAILED,         TB_POLACT_UNMEASURED_LAUNCH},
-          {TB_ERR_NONE,                        TB_POLACT_CONTINUE},
+          {TB_ERR_FATAL,                       {TB_POLACT_REBOOT}, {TB_POLACT_REBOOT}},
+          {TB_ERR_TPM_NOT_READY,               {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_SMX_NOT_SUPPORTED,           {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_VMX_NOT_SUPPORTED,           {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_TXT_NOT_SUPPORTED,           {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_CPU_NOT_READY,               {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_SINIT_NOT_PRESENT,           {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_ACMOD_VERIFY_FAILED,         {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_NONE,                        {}, {}},
       }
     },
 
-    { TB_POLTYPE_CONT_VERIFY_FAIL,             TB_POLACT_HALT,
+    { TB_POLTYPE_HALT,                         {TB_POLACT_HALT}, {TB_POLACT_HALT},
       {
-          {TB_ERR_MODULE_VERIFICATION_FAILED,  TB_POLACT_CONTINUE},
-          {TB_ERR_NV_VERIFICATION_FAILED,      TB_POLACT_CONTINUE},
-          {TB_ERR_POLICY_NOT_PRESENT,          TB_POLACT_CONTINUE},
-          {TB_ERR_POLICY_INVALID,              TB_POLACT_CONTINUE},
-          {TB_ERR_NONE,                        TB_POLACT_CONTINUE},
+          {TB_ERR_NONE,                        {}, {}},
       }
     },
 
-    { TB_POLTYPE_HALT,                         TB_POLACT_HALT,
+    { TB_POLTYPE_WARN_ON_FAILURE,              {TB_POLACT_WARN, TB_POLACT_UNMEASURED_LAUNCH},
+                                               {TB_POLACT_WARN, TB_POLACT_REBOOT},
       {
-          {TB_ERR_NONE,                        TB_POLACT_CONTINUE},
+          {TB_ERR_FATAL,                       {TB_POLACT_WARN, TB_POLACT_REBOOT},
+                                               {TB_POLACT_WARN, TB_POLACT_REBOOT}},
+          {TB_ERR_TPM_NOT_READY,               {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_SMX_NOT_SUPPORTED,           {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_VMX_NOT_SUPPORTED,           {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          {TB_ERR_TXT_NOT_SUPPORTED,           {TB_POLACT_UNMEASURED_LAUNCH}, {TB_POLACT_UNMEASURED_LAUNCH}},
+          /*
+           * whether no policy in TPM NV is error or not depends on
+           * deployment model
+           */
+          {TB_ERR_POLICY_NOT_PRESENT,          {TB_POLACT_IGNORE}, {TB_POLACT_IGNORE}},
+          {TB_ERR_NONE,                        {}, {}},
       }
     },
 };
@@ -134,7 +165,7 @@ static uint8_t _policy_index_buf[MAX_POLICY_SIZE];
 /* default policy */
 static const tb_policy_t _def_policy = {
     version        : 2,
-    policy_type    : TB_POLTYPE_CONT_NON_FATAL,
+    policy_type    : TB_POLTYPE_WARN_ON_FAILURE,
     hash_alg       : TB_HALG_SHA1,
     policy_control : TB_POLCTL_EXTEND_PCR17,
     num_entries    : 3,
@@ -164,7 +195,7 @@ static const tb_policy_t _def_policy = {
 /* default policy for Details/Authorities pcr mapping */
 static const tb_policy_t _def_policy_da = {
     version        : 2,
-    policy_type    : TB_POLTYPE_CONT_NON_FATAL,
+    policy_type    : TB_POLTYPE_WARN_ON_FAILURE,
     hash_alg       : TB_HALG_SHA1,
     policy_control : TB_POLCTL_EXTEND_PCR17,
     num_entries    : 3,
@@ -536,30 +567,35 @@ static bool is_hash_in_policy_entry(const tb_policy_entry_t *pol_entry,
 /*
  * map policy type + error -> action
  */
-static tb_policy_action_t evaluate_error(tb_error_t error)
-{
-    tb_policy_action_t action = TB_POLACT_HALT;
 
-    if ( error == TB_ERR_NONE )
-        return TB_POLACT_CONTINUE;
+/* there appears to be a compiler bug that prevents this being local static */
+static const tb_policy_action_t *no_actions = (const tb_policy_action_t [])
+                                              {TB_POLACT_HALT, TB_POLACT_HALT};
+
+static const tb_policy_action_t *evaluate_error(tb_error_t error)
+{
+    const tb_policy_action_t *actions = no_actions;
 
     for ( unsigned int i = 0; i < ARRAY_SIZE(g_policy_map); i++ ) {
         if ( g_policy_map[i].policy_type == g_policy->policy_type ) {
-            action = g_policy_map[i].default_action;
+            actions = txt_is_launched() ? g_policy_map[i].default_post_actions :
+                                          g_policy_map[i].default_pre_actions;
             for ( unsigned int j = 0;
                   j < ARRAY_SIZE(g_policy_map[i].exception_action_table);
                   j++ ) {
                 if ( g_policy_map[i].exception_action_table[j].error ==
-                     error )
-                    action = g_policy_map[i].exception_action_table[j].action;
-                if ( g_policy_map[i].exception_action_table[j].error ==
                      TB_ERR_NONE )
                     break;
+                if ( g_policy_map[i].exception_action_table[j].error ==
+                     error )
+                    actions = txt_is_launched() ?
+                        g_policy_map[i].exception_action_table[j].post_actions :
+                        g_policy_map[i].exception_action_table[j].pre_actions;
             }
         }
     }
 
-    return action;
+    return actions;
 }
 
 /*
@@ -567,34 +603,59 @@ static tb_policy_action_t evaluate_error(tb_error_t error)
  */
 void apply_policy(tb_error_t error)
 {
-    tb_policy_action_t action;
+    if ( error == TB_ERR_NONE )
+        return;
 
-    /* save the error to TPM NV */
-    write_tb_error_code(error);
+    print_tb_error_msg(error);
 
-    if ( error != TB_ERR_NONE )
-        print_tb_error_msg(error);
+    const tb_policy_action_t *actions = evaluate_error(error);
 
-    action = evaluate_error(error);
-    switch ( action ) {
-        case TB_POLACT_CONTINUE:
-            return;
-        case TB_POLACT_UNMEASURED_LAUNCH:
-            /* restore mtrr state saved before */
-            restore_mtrrs(NULL);
-            if ( s3_flag )
-                s3_launch();
-            else
-                launch_kernel(false);
-            break; /* if launch xen fails, do halt at the end */
-        case TB_POLACT_HALT:
-            break; /* do halt at the end */
-        default:
-            printk(TBOOT_ERR"Error: invalid policy action (%d)\n", action);
-            /* do halt at the end */
+    /*
+     * write error to TXT.ERRORCODE (if post-launch) and to tboot's TPM NV
+     * error index (if defined)
+     * don't log error if TB_POLACT_IGNORE or if error was that there was a
+     * previous error
+     */
+    if ( error != TB_ERR_PREV_LAUNCH_FAILURE && actions[0] != TB_POLACT_IGNORE )
+        write_tb_error(error);
+
+    for ( unsigned int i = 0; i < MAX_ACTIONS; i++ ) {
+        switch ( actions[i] ) {
+            case TB_POLACT_CONTINUE:
+            case TB_POLACT_IGNORE:
+                return;
+            case TB_POLACT_UNMEASURED_LAUNCH:
+                /* restore mtrr state saved before */
+                restore_mtrrs(NULL);
+                if ( s3_flag )
+                    s3_launch();
+                else
+                    launch_kernel(false);
+                break; /* if launch xen fails, do reboot at the end */
+            case TB_POLACT_HALT:
+                _tboot_shared.shutdown_type = TB_SHUTDOWN_HALT;
+                shutdown();
+                break;
+            case TB_POLACT_REBOOT:
+                _tboot_shared.shutdown_type = TB_SHUTDOWN_REBOOT;
+                shutdown();
+                break;
+            case TB_POLACT_WARN:
+                /* display message to user */
+                printk("%s\n", warning_msg);
+                vga_puts(warning_msg, strlen(warning_msg));
+                /* wait to let user read it */
+                delay(WARN_DELAY);
+                break;
+            default:
+                printk("Error: invalid policy action (%u)\n", actions[i]);
+                _tboot_shared.shutdown_type = TB_SHUTDOWN_REBOOT;
+                shutdown();
+        }
     }
 
-    _tboot_shared.shutdown_type = TB_SHUTDOWN_HALT;
+    /* shouldn't get here */
+    _tboot_shared.shutdown_type = TB_SHUTDOWN_REBOOT;
     shutdown();
 }
 

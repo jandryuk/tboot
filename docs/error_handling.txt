@@ -1,0 +1,219 @@
+Goal:
+====
+
+The goal of tboot's error handling logic is to provide the kernel/VMM with
+enough information to detect and remediate any errors.  This should happen
+with a minimal amount of delay (i.e. reboots) but maintain a secure
+environment at all times (i.e. not leave TXT "open" when the kernel/VMM
+is not secure).
+
+
+Error code locations:
+====================
+
+There are two locations for TXT-related errors:
+  1)  TXT.ERRORCODE (offset 0x030 in the TXT configuration space) which can
+      only be written to post-launch (and by SINIT).  The contents of this
+      register survive soft resets but are cleared on power cycles.
+  2)  TB_LAUNCH_ERR_IDX (0x20000002) TPM NV index which is writable from
+      all localities (i.e. at any time by anyone).  The contents of this
+      index persist across all types of resets and can only be cleared/changed
+      by software or by the clearing of the TPM owner.
+TXT.ERRORCODE is always present on a TXT system and is always used by SINIT
+to write its errors.  tboot will also write errors, occurring post-launch, to
+TXT.ERRORCODE.  TB_LAUNCH_ERR_IDX is optional and will be used by tboot
+if it exists.  TB_LAUNCH_ERR_IDX is not used by SINIT.
+
+
+Tboot policies:
+==============
+
+Tboot is built with a default policy hardcoded (in the _def_policy variable in
+tboot/common/policy.c).  This policy is used by tboot until it is able to load
+its owner-defined policy from TPM NV and/or if that load fails.  The use of the
+default policy and subsequent loading of the tboot owner policy happens on
+initial launch of tboot (i.e. pre-SENTER) and once it begins executing after
+SENTER.  The owner policy must be re-loaded after SENTER because tboot cannot
+trust that the policy loaded before was actually the valid policy (as code that
+executes prior to SENTER is not trusted).  If there is an error loading the
+owner-defined policy, the handling of the error is governed by the default
+policy; if the action is to continue then the default policy will remain in
+effect.
+
+The policy_type field of the tboot policy governs the behavior of tboot when
+an error is detected.  This field can contain one of the TB_POLTYPE_* values
+defined in include/tb_policy.h.  These policy type values are used to lookup
+the tb_policy_map_t (tboot/common/policy.c) that defines the action(s) to
+take for a given error.
+
+The tb_policy_map entry for a policy type contains two default actions fields,
+one for errors that occur before SENTER and the other for errors occurring
+after SENTER.  These defaults are used if there are no specific actions
+defined for a given error.  The entry also contains a table of error-codes-to-
+actions.  Each entry in the table (tb_policy_map_entry_t) consists of the
+error value and a set of pre- and post- SENTER actions (same semantics as for
+the default actions).  If an error matches one of the entries in this table
+then the actions specified in it will be used; otherwise the default actions
+will be used.
+
+The possible actions are defined by the tb_policy_action_t enum
+(tboot/common/policy.c):  TB_POLACT_IGNORE, TB_POLACT_CONTINUE,
+TB_POLACT_UNMEASURED_LAUNCH, TB_POLACT_HALT, TB_POLACT_REBOOT, TB_POLACT_WARN.
+The description of each are comments on the members of the enum and are fairly
+self-explanatory.  All errors will be written to the error locations (above)
+unless the (first) action is TB_POLACT_IGNORE.  Fatal errors (TB_ERR_FATAL)
+must never continue execution (including to launch unmeasured).
+
+There can be two actions associated with an error, though if the first action
+does not continue processing (e.g. TB_POLACT_REBOOT) then the second will not
+be executed.  Currently, only TB_POLACT_WARN makes sense as a first action in
+a multiple-action set.
+
+
+Error handling/behavior:
+=======================
+
+The handling of errors will depend on when the error occurred and in what
+component (i.e. tboot, SINIT, VMM/kernel) it was detected.  For errors detected
+by tboot, handling is also determined by the tboot policy in force at the time
+the error is detected.  Errors detected by SINIT (or the SENTER microcode)
+will always result in a TXT reset with an appropriate error code placed in the
+TXT.ERRORCODE register.
+
+When tboot detects an error, it will first determine whether there was a
+previous error (in either TXT.ERRORCODE or TB_LAUNCH_ERR_IDX)--if there was a
+previous error then tboot will not write the new error to these locations (it
+will, however take whatever action is defined in the policy).  This behavior is
+necessary to prevent "second-order" errors from overwriting the real error
+source.  For instance, when SINIT generates an error and resets the system,
+on some platforms this will set the TXT_RESET.STS which will then be detected
+as preventing a TXT launch--the real error that should be reported is the one
+from SINIT and so that should not be overwritten by the TXT_RESET.STS error.
+If an OS/VMM fixes the error then it needs to write TB_ERR_NONE to the
+TB_LAUNCH_ERR_IDX (if it is being used) and power cycle the system to clear
+the TXT.ERRORCODE register.  If the OS/VMM does not clear these locations then
+succeeding launches may revert to a non-measured launch (depending on the
+policy) even though the measured launch would succeed.
+
+On a successful completion of SENTER (and SINIT) and entry to tboot
+(i.e. post-launch), TXT.ERRORCODE will be 0xC0000001.  If SENTER/SINIT fails
+for any reason, TXT.ERRORCODE will contain the failure error code and the
+platform will be (soft) reset; TB_LAUNCH_ERR_IDX is unchanged by SINIT.
+
+On a no-error completion of tboot and launch of the VMM/kernel, TXT.ERRORCODE
+and TB_LAUNCH_INDEX will both contain (i.e. tboot will set them to) 0x00.
+Depending on the tboot policy, it is possible for tboot to allow a TXT launch
+of the VMM/kernel even if there was an error.  In this case, that (tboot)
+error code will be placed into both TXT.ERRORCODE (with the appropriate format
+as described below) and TB_LAUNCH_ERR_IDX.
+
+
+The TB_POLTYPE_CONT_NON_FATAL policy:
+------------------------------------
+This policy type is intended for debugging/development and non-production
+builds of tboot.
+
+It will reboot for fatal errors.  It will attempt a TXT launch for any error
+that would not actually prevent such a launch, even if that error would be a
+security or policy violation (e.g. TB_ERR_MODULE_VERIFICATION_FAILED or
+TB_ERR_S3_INTEGRITY).
+
+
+The TB_POLTYPE_WARN_ON_FAILURE policy:
+-------------------------------------
+This policy type is intended for production builds.
+
+For fatal errors it will display a warning/error message and pause, then
+reboot the system.  For the error of an owner-defined policy not being present
+in TPM NV, it will ignore it (not even write it to the error locations).  For
+all other errors, if the error occurs before SENTER it will warn the user and
+perform an un-measured launch of the OS/VMM; if the error occurs after SENTER
+completed, it will warn the user and reboot.  This last behavior includes the
+case of detecting an error from a previous launch.
+
+
+Previous launch error detection:
+===============================
+
+If TB_LAUNCH_ERR_IDX has an error (any value other than TB_ERR_NONE or all FFs,
+which is the value of a TPM NV index that has not been written to), then tboot
+will treat this as a previous error regardless of the value in TXT.ERRORCODE
+(since if the system had been power cycled, TXT.ERRORCODE would be cleared).
+
+Otherwise, if TXT.ERRORCODE has an error then this will be treated as a
+previous launch error.  Tboot will write TB_ERR_PREV_LAUNCH_FAILURE to
+TB_LAUNCH_ERR_IDX, if it exists.
+
+
+TXT.ERRORCODE format:
+====================
+
+Bit   Name        Description
+---   ----        -----------
+31    Valid       Valid error when set to '1'. The rest of the register
+                  contents should be ignored if '0'
+30    External    '0' if induced from the processor
+                  '1' if induced from software
+29:0  Type        This is implementation and source specific. It provides more
+                  details on the actual error.
+Processor-initiated errors (External = 0) are defined in Table 15 of the MLE
+Developers Guide.
+
+Errors generated by AC Modules will have External = 1 and will have bit 15 = 0.
+The details of the Type field (bits 29:0) for ACM errors are found in the
+sinit_error.txt file included with the SINIT ACMs.
+
+Errors generated by tboot will have External = 1 and bit 15 = 1.  The format
+of bits 29:0 is:
+
+Bit     Description
+---     -----------
+29:16   reserved
+15      1
+14:12   0 - tboot, 1-7 - kernel/VMM specific
+11:0    tboot error code (TB_ERR_*)
+
+
+OS/VMM error handling:
+=====================
+
+An OS or VMM has two options for handling errors:  use TB_LAUNCH_ERR_IDX or
+just use TXT.ERRORCODE.
+
+Using TB_LAUNCH_ERR_IDX
+-----------------------
+If TB_LAUNCH_ERR_IDX contains TB_ERR_NONE, then no error has occurred and
+there is no need to examine the TXT.ERRORCODE register.
+
+If TB_LAUNCH_ERR_IDX contains TB_ERR_PREV_LAUNCH_FAILURE, the OS/VMM needs to
+read TXT.ERRORCODE to determine the failure (see above for format).  When it
+corrects the condition, it needs to write TB_ERR_NONE to TB_LAUNCH_ERR_IDX and
+power cycle the system (in order to clear TXT.ERRORCODE).
+
+If TB_LAUNCH_ERR_IDX contains another value, then that is the failure and there
+is no need to read TXT.ERRORCODE.  If the policy allows for continuing launch
+for some errors, then there may be an error recorded even if the launch
+succeeded.  The OS/VMM can detect this by reading the TXT.STS register and
+seeing if the SENTER.DONE.STS bit (bit 0) is clear (failed).  When the OS/VMM
+corrects the condition, it needs to write TB_ERR_NONE to TB_LAUNCH_ERR_IDX and
+power cycle the system (in order to clear TXT.ERRORCODE).
+
+Using TXT.ERRORCODE
+-------------------
+If the valid bit (bit 31) is set then there has been an error.  The type of
+error can be determined according to the format as described above.  When the
+OS/VMM corrects the condition, it needs to power cycle the system in order to
+clear TXT.ERRORCODE.
+
+If the valid bit is clear, there may still have been an error that was detected
+by tboot before it attempted a launch.  Since this register is not writable
+by tboot before SENTER, tboot will not have been able to record the error.  The
+OS/VMM can still detect that the launch failed by reading the TXT.STS register
+and seeing if the SENTER.DONE.STS bit (bit 0) is clear (failed).  In such a
+case, the OS/VMM will need to use some other method to determine and remediate
+the problem.
+
+Note:  If the system is power cycled before the error condition is fixed, the
+       error code will be lost and a subsequent reboot will attempt a
+       measured launch again (and presumably fail again).
+

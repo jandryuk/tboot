@@ -49,7 +49,7 @@
 #include "tb_polgen.h"
 
 static const char *help[] = {
-    "tb_polgen --create --type        nonfatal|continue|halt\n",
+    "tb_polgen --create --type        nonfatal|warn|halt\n",
     "                   [--ctrl       <policy control value>]\n",
     "                   [--verbose]\n",
     "                   <policy file name>\n",
@@ -111,7 +111,7 @@ typedef struct {
 
 static option_table_t policy_type_opts[] = {
     {"nonfatal",     int_opt : TB_POLTYPE_CONT_NON_FATAL},
-    {"continue",     int_opt : TB_POLTYPE_CONT_VERIFY_FAIL},
+    {"warn",         int_opt : TB_POLTYPE_WARN_ON_FAILURE},
     {"halt",         int_opt : TB_POLTYPE_HALT},
     {NULL}
 };

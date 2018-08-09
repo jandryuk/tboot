@@ -182,8 +182,9 @@ static void post_launch(void)
     err = txt_protect_mem_regions();
     apply_policy(err);
 
-    /* ensure all modules are in RAM */
-    if ( !verify_modules(g_ldr_ctx) )     apply_policy(TB_ERR_POST_LAUNCH_VERIFICATION);
+    /* ensure all modules are in RAM (after reserving anything). */
+    if ( !verify_modules(g_ldr_ctx) )
+        apply_policy(TB_ERR_POST_LAUNCH_VERIFICATION);
 
     /* verify that tboot is in valid RAM (i.e. E820_RAM) */
     base = (uint64_t)TBOOT_BASE_ADDR;
@@ -296,7 +297,7 @@ void launch_racm(void)
 
     /* prepare cpu */
     if ( !prepare_cpu() )
-        apply_policy(TB_ERR_FATAL);
+        apply_policy(TB_ERR_CPU_NOT_READY);
 
     /* prepare tpm */
     if ( !prepare_tpm() )
@@ -415,7 +416,7 @@ void begin_launch(void *addr, uint32_t magic)
     apply_policy(err);
 
     /* print any errors on last boot, which must be from TXT launch */
-    txt_get_error();
+    display_last_boot_error();
 
     /* need to verify that platform can perform measured launch */
     err = verify_platform();
@@ -445,9 +446,10 @@ void begin_launch(void *addr, uint32_t magic)
     }
 
     /* check for error from previous boot */
-    printk(TBOOT_INFO"checking previous errors on the last boot.\n\t");
-    if ( was_last_boot_error() )
+    if ( was_last_boot_error() ) {
         printk(TBOOT_INFO"last boot has error.\n");
+        apply_policy(TB_ERR_PREV_LAUNCH_FAILURE);
+    }
     else
         printk(TBOOT_INFO"last boot has no error.\n");
 
@@ -481,6 +483,9 @@ void s3_launch(void)
     /* (optionally) pause when transferring kernel resume */
     if ( g_vga_delay > 0 )
         delay(g_vga_delay * 1000);
+
+    /* launch succeeded, so clear error codes */
+    write_tb_error(TB_ERR_NONE);
 
     _prot_to_real(g_post_k_s3_state.kernel_s3_resume_vector);
 }

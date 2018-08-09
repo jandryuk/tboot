@@ -116,7 +116,7 @@ void map_pages_to_tboot(unsigned long vstart,
 }
 
 /* map tboot pages into tboot */
-static void map_tboot_pages(unsigned long pfn, unsigned long nr_pfns)
+static bool map_tboot_pages(unsigned long pfn, unsigned long nr_pfns)
 {
     uint64_t start, end;
 
@@ -131,10 +131,12 @@ static void map_tboot_pages(unsigned long pfn, unsigned long nr_pfns)
     if ( end > DIRECTMAP_VIRT_END ) {
         printk(TBOOT_ERR"0x%llx ~ 0x%llx cannot be mapped as direct map\n", start, end);
         disable_paging();
-        apply_policy(TB_ERR_FATAL);
+        return false;
     }
 
     map_pages_to_tboot(start, pfn, nr_pfns);
+
+    return true;
 }
 
 /* destroy the map */
@@ -187,13 +189,16 @@ static unsigned long build_directmap_pagetable(void)
     tboot_epfn = ((unsigned long)(TBOOT_KERNEL_CMDLINE_ADDR
                      + TBOOT_KERNEL_CMDLINE_SIZE + MAC_PAGE_SIZE - 1))
                      >> TB_L1_PAGETABLE_SHIFT;
-    map_tboot_pages(tboot_spfn, tboot_epfn - tboot_spfn);
+    if (! map_tboot_pages(tboot_spfn, tboot_epfn - tboot_spfn))
+        return 0;
+
 
     /* map tboot */
     tboot_spfn = (unsigned long)&_start >> TB_L1_PAGETABLE_SHIFT;
     tboot_epfn = ((unsigned long)&_end + MAC_PAGE_SIZE - 1)
                      >> TB_L1_PAGETABLE_SHIFT;
-    map_tboot_pages(tboot_spfn, tboot_epfn - tboot_spfn);
+    if (! map_tboot_pages(tboot_spfn, tboot_epfn - tboot_spfn))
+        return 0;
 
     return (unsigned long)pdptr_table;
 }
@@ -203,6 +208,7 @@ static unsigned long cr0, cr4;
 bool enable_paging(void)
 {
     unsigned long eflags;
+    unsigned long new_cr3;
 
     /* disable interrupts */
     eflags = read_eflags();
@@ -217,8 +223,11 @@ bool enable_paging(void)
 
     write_cr4((cr4 | CR4_PAE | CR4_PSE) & ~CR4_PGE);
 
-    write_cr3(build_directmap_pagetable());
-    write_cr0(cr0 | CR0_PG);
+    new_cr3 = build_directmap_pagetable();
+    if (new_cr3 != 0) {
+        write_cr3(new_cr3);
+        write_cr0(cr0 | CR0_PG);
+    }
 
     /* enable interrupts */
     write_eflags(eflags);

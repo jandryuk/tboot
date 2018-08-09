@@ -36,45 +36,59 @@
 #ifndef __TB_ERROR_H__
 #define __TB_ERROR_H__
 
+/* see errorcode.h for format */
+#define MAKE_TBOOT_ERRORCODE(err)     (0xc0000000 | 0x8000 | (err))
+
+#ifdef __ASSEMBLY__
+
+/* special errorcode used for layout error (in boot.S) */
+#define TB_ERR_LAYOUT 1
+
+#else
+
 typedef enum {
-    TB_ERR_NONE                = 0,         /* succeed */
-    TB_ERR_FIXED               = 1,         /* previous error has been fixed */
+    TB_ERR_NONE                       = 0,  /* succeed */
+    TB_ERR_LAYOUT                     = 1,  /* layout in boot.S (not matches) */
 
-    TB_ERR_GENERIC,                         /* non-fatal generic error */
+    TB_ERR_GENERIC                    = 2,  /* non-fatal generic error */
 
-    TB_ERR_TPM_NOT_READY,                   /* tpm not ready */
-    TB_ERR_SMX_NOT_SUPPORTED,               /* smx not supported */
-    TB_ERR_VMX_NOT_SUPPORTED,               /* vmx not supported */
-    TB_ERR_TXT_NOT_SUPPORTED,               /* txt not supported */
+    TB_ERR_TPM_NOT_READY              = 3,  /* tpm not ready */
+    TB_ERR_SMX_NOT_SUPPORTED          = 4,  /* smx not supported */
+    TB_ERR_VMX_NOT_SUPPORTED          = 5,  /* vmx not supported */
+    TB_ERR_TXT_NOT_SUPPORTED          = 6,  /* txt not supported */
+    TB_ERR_CPU_NOT_READY              = 7,  /* CPU not able to launch */
 
-    TB_ERR_MODULE_VERIFICATION_FAILED,      /* module failed to verify against
+    TB_ERR_MODULE_VERIFICATION_FAILED = 8,  /* module failed to verify against
                                                policy */
-    TB_ERR_MODULES_NOT_IN_POLICY,           /* modules in mbi but not in
+    TB_ERR_MODULES_NOT_IN_POLICY      = 9,  /* modules in mbi but not in
                                                policy */
-    TB_ERR_POLICY_INVALID,                  /* policy is invalid */
-    TB_ERR_POLICY_NOT_PRESENT,              /* no policy in TPM NV */
+    TB_ERR_POLICY_INVALID             = 10, /* policy is invalid */
+    TB_ERR_POLICY_NOT_PRESENT         = 11, /* no policy in TPM NV */
 
-    TB_ERR_SINIT_NOT_PRESENT,               /* SINIT ACM not provided */
-    TB_ERR_ACMOD_VERIFY_FAILED,             /* verifying AC module failed */
+    TB_ERR_SINIT_NOT_PRESENT          = 12, /* SINIT ACM not provided */
+    TB_ERR_ACMOD_VERIFY_FAILED        = 13, /* verifying AC module failed */
 
-    TB_ERR_POST_LAUNCH_VERIFICATION,        /* verification of post-launch
+    TB_ERR_POST_LAUNCH_VERIFICATION   = 14, /* verification of post-launch
                                                failed */
-    TB_ERR_S3_INTEGRITY,                    /* creation or verification of
+    TB_ERR_S3_INTEGRITY               = 15, /* creation or verification of
                                                S3 integrity measurements
                                                failed */
 
-    TB_ERR_FATAL,                           /* generic fatal error */
-    TB_ERR_NV_VERIFICATION_FAILED,          /* NV failed to verify against
+    TB_ERR_FATAL                      = 16, /* generic fatal error */
+    TB_ERR_NV_VERIFICATION_FAILED     = 17, /* NV failed to verify against
                                                policy */
-    TB_ERR_MAX
+    TB_ERR_PREV_LAUNCH_FAILURE        = 18, /* failure on previous launch */
+
+    TB_ERR_MAX                              /* must be <= 2^12 */
 } tb_error_t;
 
 
 extern void print_tb_error_msg(tb_error_t error);
-extern bool read_tb_error_code(tb_error_t *error);
-extern bool write_tb_error_code(tb_error_t error);
+extern bool read_error_index(tb_error_t *error);
+extern void write_tb_error(tb_error_t error);
 extern bool was_last_boot_error(void);
 
+#endif /* __ASSEMBLY__ */
 
 #endif /* __TB_ERROR_H__ */
 
