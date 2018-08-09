@@ -2180,6 +2180,21 @@ static bool tpm20_get_random(struct tpm_if *ti, uint32_t locality,
     return true;
 }
 
+static uint32_t tpm20_shutdown(struct tpm_if *ti, uint32_t locality)
+{
+    u32 ret;
+
+    if ( ti == NULL )
+        return false;
+
+    ret = _tpm20_shutdown(locality, TPM_SU_CLEAR);
+    if ( ret != TPM_RC_SUCCESS ) {
+        printk(TBOOT_WARN"TPM: Shutdown, return value = %08X\n", ret);
+        ti->error = ret;
+    }
+
+    return ret;
+}
 static uint32_t tpm20_save_state(struct tpm_if *ti, uint32_t locality)
 {
     u32 ret;
@@ -2392,6 +2407,7 @@ struct tpm_if tpm_20_if = {
     .verify_creation = tpm20_verify_creation,
     .get_random = tpm20_get_random,
     .save_state = tpm20_save_state,
+    .shutdown = tpm20_shutdown,
     .cap_pcrs = tpm20_cap_pcrs,
 };
 

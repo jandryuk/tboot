@@ -474,6 +474,7 @@ struct tpm_if {
     bool (*get_random)(struct tpm_if *ti, u32 locality, u8 *random_data, u32 *data_size);
 
     uint32_t (*save_state)(struct tpm_if *ti, u32 locality);
+    uint32_t (*shutdown)(struct tpm_if *ti, u32 locality);
 
     bool (*cap_pcrs)(struct tpm_if *ti, u32 locality, int pcr);
     bool (*check)(void);
