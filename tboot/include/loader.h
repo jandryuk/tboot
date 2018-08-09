@@ -82,6 +82,7 @@ extern bool verify_modules(loader_ctx *lctx);
 extern module_t *get_module(loader_ctx *lctx, unsigned int i);
 extern unsigned int get_module_count(loader_ctx *lctx);
 extern bool remove_txt_modules(loader_ctx *lctx);
+extern void adjust_modules(loader_ctx *lctx);
 
 extern bool	have_loader_memlimits(loader_ctx *lctx);
 extern bool have_loader_memmap(loader_ctx *lctx);
