@@ -490,6 +490,7 @@ extern bool release_locality(uint32_t locality);
 extern bool prepare_tpm(void);
 extern bool tpm_detect(void);
 extern void tpm_print(struct tpm_if *ti);
+void tpm_protect_mem_regions(void);
 extern bool tpm_submit_cmd(u32 locality, u8 *in, u32 in_size, u8 *out, u32 *out_size);
 extern bool tpm_submit_cmd_crb(u32 locality, u8 *in, u32 in_size, u8 *out, u32 *out_size);
 extern bool tpm_wait_cmd_ready(uint32_t locality);
