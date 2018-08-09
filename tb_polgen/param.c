@@ -50,6 +50,7 @@
 
 static const char *help[] = {
     "tb_polgen --create --type        nonfatal|warn|halt\n",
+    "                   --alg         sha1|sha256\n",
     "                   [--ctrl       <policy control value>]\n",
     "                   [--verbose]\n",
     "                   <policy file name>\n",
@@ -99,6 +100,7 @@ static struct option long_options[] =
     {"image",          required_argument,    NULL,    'i'},
     {"pos",            required_argument,    NULL,    'o'},
     {"elt",            required_argument,    NULL,    'e'},
+    {"alg",            required_argument,    NULL,    'a'},
 
     {"verbose",        no_argument,          (int*)&verbose, true},
     {0, 0, 0, 0}
@@ -119,6 +121,12 @@ static option_table_t policy_type_opts[] = {
 static option_table_t hash_type_opts[] = {
     {"image",        int_opt : TB_HTYPE_IMAGE},
     {"any",          int_opt : TB_HTYPE_ANY},
+    {NULL}
+};
+
+static option_table_t hash_alg_opts[] = {
+    {"sha1",            int_opt : TB_HALG_SHA1},
+    {"sha256",          int_opt : TB_HALG_SHA256},
     {NULL}
 };
 
@@ -190,6 +198,7 @@ void print_params(param_data_t *params)
     info_msg("\t image_file = %s\n", params->image_file);
     info_msg("\t elt_file = %s\n", params->elt_file);
     info_msg("\t policy_file = %s\n", params->policy_file);
+    info_msg("\t hash_alg = 0x%x\n", params->hash_alg);
 }
 
 static bool validate_params(param_data_t *params)
@@ -213,6 +222,10 @@ static bool validate_params(param_data_t *params)
             }
             if ( (params->policy_control & ~TB_POLCTL_EXTEND_PCR17) != 0 ) {
                 msg = "Invalid --ctrl value\n";
+                goto error;
+            }
+            if ( params->hash_alg == -1 ) {
+                msg = "Missing --alg option\n";
                 goto error;
             }
             return true;
@@ -321,9 +334,10 @@ bool parse_input_params(int argc, char **argv, param_data_t *params)
     params->cmdline[0] = '\0';
     params->image_file[0] = '\0';
     params->elt_file[0] = '\0';
+    params->hash_alg = -1;
 
     while ( true ) {
-        c = getopt_long_only(argc, argv, "HCADUSt:c:n:p:h:l:i:o:e:",
+        c = getopt_long_only(argc, argv, "HCADUSt:c:n:p:h:l:i:o:e:a:",
                              long_options, &option_index);
         if ( c == -1 )     /* no more args */
             break;
@@ -427,6 +441,13 @@ bool parse_input_params(int argc, char **argv, param_data_t *params)
                 }
                 strncpy(params->elt_file, optarg, sizeof(params->elt_file));
                 params->elt_file[sizeof(params->elt_file)-1] = '\0';
+                break;
+            case 'a':
+                if ( !parse_int_option(hash_alg_opts, optarg,
+                                       (int *) &params->hash_alg) ) {
+                    error_msg("Unknown --alg option\n");
+                    return false;
+                }
                 break;
             default:
                 break;
