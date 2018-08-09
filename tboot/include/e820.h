@@ -88,6 +88,8 @@ extern bool get_ram_ranges(uint64_t *min_lo_ram, uint64_t *max_lo_ram,
                            uint64_t *min_hi_ram, uint64_t *max_hi_ram);
 extern bool e820_get_highest_sized_ram(uint64_t size, uint64_t limit,
                                        uint64_t *ram_base, uint64_t *ram_size);
+extern bool get_ram_region(uint64_t addr,
+                           uint64_t *ram_base, uint64_t *ram_size);
 
 #endif    /* __E820_H__ */
 
