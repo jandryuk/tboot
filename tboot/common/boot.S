@@ -38,6 +38,7 @@
 #include <msr.h>
 #include <page.h>
 #include <processor.h>
+#include <tb_error.h>
 
 #define BSP_STACK_SIZE		0x2000
 #define AP_STACK_SIZE		0x0800
@@ -173,17 +174,17 @@ ENTRY(_post_launch_entry)
 	je __start                /* yes, so continue with normal launch */
 
 layout_err:       /* layout check failed so TXT RESET */
-	                 /* set a special error code */
-	movl $LAYOUT_ERR, (TXT_PRIV_CONFIG_REGS_BASE + TXTCR_ERRORCODE)
-	                 /* unlock memory config (and serialize) */
+	                /* unlock memory config (and serialize) */
+                        /* set an error code (can't safely write to
+                           TB_LAUNCH_ERR_IDX at this time */
+	mov $MAKE_TBOOT_ERRORCODE(TB_ERR_LAYOUT), %eax
+	movl %eax, (TXT_PRIV_CONFIG_REGS_BASE + TXTCR_ERRORCODE)
 	movl $1, (TXT_PRIV_CONFIG_REGS_BASE + TXTCR_CMD_UNLOCK_MEM_CONFIG)
 	movl (TXT_PRIV_CONFIG_REGS_BASE + TXTCR_STS), %eax
 	                 /* TXT RESET */
 	movl $1, (TXT_PRIV_CONFIG_REGS_BASE + TXTCR_CMD_RESET)
-	mov $6, %eax
-	mov $0xcf9, %edx
-	out %al, (%dx)   /* for debug chipsets where TXT RESET may not work */
-	ud2
+                         /* give chipset time to reset CPU */
+1:      jmp 1b
 
 
 ENTRY(__start)

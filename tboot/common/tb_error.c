@@ -50,6 +50,8 @@
 #include <tboot.h>
 #include <txt/config_regs.h>
 #include <cmdline.h>
+#include <txt/txt.h>
+#include <txt/errorcode.h>
 
 #define TB_LAUNCH_ERR_IDX     0x20000002      /* launch error index */
 
@@ -66,9 +68,6 @@ void print_tb_error_msg(tb_error_t error)
     switch( error ) {
         case TB_ERR_NONE:
             printk(TBOOT_INFO"succeeded.\n");
-            break;
-        case TB_ERR_FIXED:
-            printk(TBOOT_INFO"previous error has been fixed.\n");
             break;
         case TB_ERR_GENERIC:
             printk(TBOOT_WARN"non-fatal generic error.\n");
@@ -87,6 +86,9 @@ void print_tb_error_msg(tb_error_t error)
 	    break;
 	case TB_ERR_TXT_NOT_SUPPORTED:
             printk(TBOOT_ERR"TXT not supported.\n");
+            break;
+        case TB_ERR_CPU_NOT_READY:
+            printk(TBOOT_ERR"CPU not ready for launch.\n");
             break;
         case TB_ERR_MODULES_NOT_IN_POLICY:
             printk(TBOOT_ERR"modules in mbi but not in policy.\n");
@@ -128,12 +130,39 @@ void print_tb_error_msg(tb_error_t error)
 }
 
 /*
- * read_tb_error_code
+ * write_error_index
+ *
+ * write error code to TPM NV
+ *
+ */
+static void write_error_index(tb_error_t error)
+{
+    struct tpm_if *tpm = get_tpm();
+    const struct tpm_if_fp *tpm_fp = get_tpm_fp();
+
+    if ( !tpm || !tpm_fp || no_err_idx )
+         return;
+
+    /* to prevent wearout, only write if data has changed */
+    tb_error_t prev_error = TB_ERR_NONE;
+    if ( read_error_index(&prev_error) ) {
+        if ( prev_error != error ) {
+            if ( !tpm_fp->nv_write(tpm, 0, tpm->tb_err_index, 0,
+                                      (uint8_t *)&error,
+                                      sizeof(tb_error_t)) ) {
+                no_err_idx = true;
+            }
+        }
+    }
+}
+
+/*
+ * read_error_index
  *
  * read error code from TPM NV (TB_LAUNCH_ERR_IDX)
  *
  */
-bool read_tb_error_code(tb_error_t *error)
+bool read_error_index(tb_error_t *error)
 {
     uint32_t size = sizeof(tb_error_t);
     struct tpm_if *tpm = get_tpm();
@@ -162,52 +191,36 @@ bool read_tb_error_code(tb_error_t *error)
 }
 
 /*
- * write_tb_error_code
+ * write_tb_error
  *
- * write error code into TPM NV (TB_LAUNCH_ERR_IDX)
+ * write error code to TXT.ERRORCODE (if post-launch) and into
+ * TPM NV (TB_LAUNCH_ERR_IDX) (if defined).
  *
  */
-bool write_tb_error_code(tb_error_t error)
+void write_tb_error(tb_error_t error)
 {
-    struct tpm_if *tpm = get_tpm();
-    const struct tpm_if_fp *tpm_fp = get_tpm_fp();
-    
-    if ( get_tboot_ignore_prev_err() )
-        return true;
-
-    if ( !tpm || !tpm_fp || no_err_idx )
-        return false;
-
-    if ( !tpm_fp->nv_write(tpm, tpm->cur_loc, tpm->tb_err_index, 0,
-				      (uint8_t *)&error, sizeof(tb_error_t)) ) {
-        printk(TBOOT_WARN"Error: write TPM error: 0x%x.\n", tpm->error);
-        no_err_idx = true;
-        return false;
+    /* don't write (new) error if there is an existing error */
+    if ( txt_has_error() ) {
+        printk("previous error exists, not overwriting\n");
+        return;
     }
 
-    return true;
-}
+    /* write to TXT.ERRORCODE only if we're post-launch */
+    if ( txt_is_launched() ) {
+        /* must do this in fn, so do here */
+        COMPILE_TIME_ASSERT( TB_ERR_MAX <= (1<<12) );
 
-/*
- * was_last_boot_error
- * false: no error; true: error
- */
-bool was_last_boot_error(void)
-{
-    tb_error_t error;
-    txt_errorcode_t txt_err;
+        tboot_errorcode_t tboot_err;
 
-    /* check TB_LAUNCH_ERR_IDX */
-    if ( read_tb_error_code(&error) ) {
-        if ( error != TB_ERR_FIXED && error != TB_ERR_NONE )
-            return true;
+        /* TB_ERR_NONE is not really an error, so just write 0s */
+        if ( error == TB_ERR_NONE )
+            tboot_err._raw = 0;
+        else
+            tboot_err._raw = MAKE_TBOOT_ERRORCODE(error);
+        write_priv_config_reg(TXTCR_ERRORCODE, tboot_err._raw);
+        printk("writing error (0x%Lx) to TXT.ERRORCODE\n", tboot_err._raw);
     }
 
-    /* check TXT.ERRORCODE */
-    txt_err = (txt_errorcode_t)read_pub_config_reg(TXTCR_ERRORCODE);
-    if ( txt_err.valid && txt_err.type > 0 )
-        return true;
-
-    return false;
+    /* write to TB_LAUNCH_ERR_IDX, if it exists */
+    write_error_index(error);
 }
-

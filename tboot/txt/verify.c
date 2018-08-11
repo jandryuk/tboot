@@ -216,6 +216,18 @@ tb_error_t supports_txt(void)
     printk(TBOOT_INFO"SMX is enabled\n");
 
     /*
+     * display LT.ESTS error
+     */
+    txt_ests_t ests = (txt_ests_t)read_pub_config_reg(TXTCR_ESTS);
+    printk("LT.ESTS: 0x%Lx\n", ests._raw);
+
+    /*
+     * display LT.E2STS error
+     */
+    txt_e2sts_t e2sts = (txt_e2sts_t)read_pub_config_reg(TXTCR_E2STS);
+    printk("LT.E2STS: 0x%Lx\n", e2sts._raw);
+
+    /*
      * verify that an TXT-capable chipset is present and
      * check that all needed SMX capabilities are supported
      */
@@ -372,12 +384,6 @@ void set_vtd_pmrs(os_sinit_data_t *os_sinit_data,
 tb_error_t txt_verify_platform(void)
 {
     txt_heap_t *txt_heap;
-    tb_error_t err;
-
-    /* check TXT supported */
-    err = supports_txt();
-    if ( err != TB_ERR_NONE )
-        return err;
 
     if ( !vtd_bios_enabled() ) {
         return TB_ERR_VTD_NOT_SUPPORTED;
