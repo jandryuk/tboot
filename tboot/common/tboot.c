@@ -188,8 +188,9 @@ static void post_launch(void)
     err = txt_protect_mem_regions();
     apply_policy(err);
 
-    /* ensure all modules are in RAM */
-    if ( !verify_modules(g_ldr_ctx) )     apply_policy(TB_ERR_POST_LAUNCH_VERIFICATION);
+    /* ensure all modules are in RAM (after reserving anything). */
+    if ( !verify_modules(g_ldr_ctx) )
+        apply_policy(TB_ERR_POST_LAUNCH_VERIFICATION);
 
     /* verify that tboot is in valid RAM (i.e. E820_RAM) */
     base = (uint64_t)TBOOT_BASE_ADDR;
@@ -311,7 +312,7 @@ void launch_racm(void)
 
     /* prepare cpu */
     if ( !prepare_cpu() )
-        apply_policy(TB_ERR_FATAL);
+        apply_policy(TB_ERR_CPU_NOT_READY);
 
     /* prepare tpm */
     if ( !prepare_tpm() )
@@ -432,6 +433,8 @@ void begin_launch(void *addr, uint32_t magic)
 
     /* print any errors on last boot, which must be from TXT launch */
     txt_display_errors();
+
+    /* if previous ML failed apply policy, unless ignored explicitely. */
     if (txt_has_error() && get_tboot_ignore_prev_err() == false) {
         apply_policy(TB_ERR_PREV_TXT_ERROR);
     }
@@ -462,13 +465,6 @@ void begin_launch(void *addr, uint32_t magic)
         printk(TBOOT_ERR"we should never get here\n");
         apply_policy(TB_ERR_FATAL);
     }
-
-    /* check for error from previous boot */
-    printk(TBOOT_INFO"checking previous errors on the last boot.\n\t");
-    if ( was_last_boot_error() )
-        printk(TBOOT_INFO"last boot has error.\n");
-    else
-        printk(TBOOT_INFO"last boot has no error.\n");
 
     if ( !prepare_tpm() )
         apply_policy(TB_ERR_TPM_NOT_READY);
@@ -507,6 +503,9 @@ void s3_launch(void)
     /* (optionally) pause when transferring kernel resume */
     if ( g_vga_delay > 0 )
         delay(g_vga_delay * 1000);
+
+    /* launch succeeded, so clear error codes */
+    write_tb_error(TB_ERR_NONE);
 
     _prot_to_real(g_post_k_s3_state.kernel_s3_resume_vector);
 }

@@ -33,18 +33,28 @@
  *
  */
 
+/* see errorcode.h for format */
+#define MAKE_TBOOT_ERRORCODE(err)     (0xc0000000 | 0x8000 | (err))
+
+#ifdef __ASSEMBLY__
+
+/* special errorcode used for layout error (in boot.S) */
+#define TB_ERR_LAYOUT 1
+
+#else
+
 #ifndef __TB_ERROR_H__
 #define __TB_ERROR_H__
 
 typedef enum {
     TB_ERR_NONE                = 0,         /* succeed */
-    TB_ERR_FIXED               = 1,         /* previous error has been fixed */
     TB_ERR_GENERIC,                         /* non-fatal generic error */
     TB_ERR_TPM_NOT_READY,                   /* tpm not ready */
     TB_ERR_SMX_NOT_SUPPORTED,               /* smx not supported */
     TB_ERR_VMX_NOT_SUPPORTED,               /* vmx not supported */
     TB_ERR_VTD_NOT_SUPPORTED,               /* Vt-D not enabled in BIOS */
     TB_ERR_TXT_NOT_SUPPORTED,               /* txt not supported */
+    TB_ERR_CPU_NOT_READY,                   /* CPU not able to launch */
     TB_ERR_MODULE_VERIFICATION_FAILED,      /* module failed to verify against
                                                policy */
     TB_ERR_MODULES_NOT_IN_POLICY,           /* modules in mbi but not in
@@ -68,10 +78,11 @@ typedef enum {
 
 
 extern void print_tb_error_msg(tb_error_t error);
-extern bool read_tb_error_code(tb_error_t *error);
-extern bool write_tb_error_code(tb_error_t error);
-extern bool was_last_boot_error(void);
+extern bool read_tb_error(tb_error_t *error);
+extern void write_tb_error(tb_error_t error);
+extern bool read_error_index(tb_error_t *error);
 
+#endif /* __ASSEMBLY__ */
 
 #endif /* __TB_ERROR_H__ */
 

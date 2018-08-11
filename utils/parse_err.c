@@ -57,7 +57,7 @@ static inline uint64_t read_txt_config_reg(void *config_regs_base,
 
 int main(int argc, char *argv[])
 {
-    txt_errorcode_t err;
+    uint64_t err;
 
     if ( argc > 2 ) {
         printf("usage:  %s [<TXT.ERRORCODE value>]\n", argv[0]);
@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     }
 
     if ( argc == 2 ) {
-        err._raw = strtoul(argv[1], NULL, 0);
+        err = strtoul(argv[1], NULL, 0);
         if ( errno != 0 ) {
             printf("Error:  TXT.ERRORCODE value is not a valid number\n");
             return 1;
@@ -85,41 +85,13 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        err._raw = read_txt_config_reg(txt_pub, TXTCR_ERRORCODE);
+        err = read_txt_config_reg(txt_pub, TXTCR_ERRORCODE);
 
         munmap(txt_pub, TXT_CONFIG_REGS_SIZE);
         close(fd_mem);
     }
 
-    printf("ERRORCODE: 0x%08jx\n", err._raw);
-
-    /* AC module error (don't know how to parse other errors) */
-    if ( err.valid ) {
-        if ( err.external == 0 )       /* processor error */
-            printk("\t processor error 0x%x\n", (uint32_t)err.type);
-        else {                         /* external SW error */
-            txt_errorcode_sw_t sw_err;
-            sw_err._raw = err.type;
-            if ( sw_err.src == 1 )     /* unknown SW error */
-                printk("unknown SW error 0x%x:0x%x\n", sw_err.err1, sw_err.err2);
-            else {                     /* ACM error */
-                acmod_error_t acmod_err;
-                acmod_err._raw = sw_err._raw;
-                printk("AC module error : acm_type=0x%x, progress=0x%02x, "
-                       "error=0x%x\n", acmod_err.acm_type, acmod_err.progress,
-                       acmod_err.error);
-                /* error = 0x0a, progress = 0x0d => TPM error */
-                if ( acmod_err.error == 0x0a && acmod_err.progress == 0x0d )
-                    printk("TPM error code = 0x%x\n", acmod_err.tpm_err);
-                /* progress = 0x10 => LCP2 error */
-                else if ( acmod_err.progress == 0x10 && acmod_err.lcp_minor != 0 )
-                    printk("LCP2 error:  minor error = 0x%x, index = %u\n",
-                           acmod_err.lcp_minor, acmod_err.lcp_index);
-            }
-        }
-    }
-    else
-        printk("no error\n");
+    display_txt_errorcode(err);
 
     return 0;
 }

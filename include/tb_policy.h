@@ -43,9 +43,9 @@
 enum {
     TB_POLTYPE_CONT_NON_FATAL,     /* ignore all non-fatal errors and */
                                    /* continue */
-    TB_POLTYPE_CONT_VERIFY_FAIL,   /* ignore verification errors and */
-                                   /* halt otherwise */
     TB_POLTYPE_HALT,               /* halt on any errors */
+    TB_POLTYPE_WARN_ON_FAILURE,    /* display warning if there is a failure
+                                      (and then do unmeasured launch) */
     TB_POLTYPE_MAX
 };
 
@@ -136,10 +136,10 @@ static inline const char *policy_type_to_string(uint8_t policy_type)
 {
     if ( policy_type == TB_POLTYPE_CONT_NON_FATAL )
         return "TB_POLTYPE_CONT_NON_FATAL";
-    else if ( policy_type == TB_POLTYPE_CONT_VERIFY_FAIL )
-        return "TB_POLTYPE_CONT_VERIFY_FAIL";
     else if ( policy_type == TB_POLTYPE_HALT )
         return "TB_POLTYPE_HALT";
+    else if ( policy_type == TB_POLTYPE_WARN_ON_FAILURE )
+        return "TB_POLTYPE_WARN_ON_FAILURE";
     else {
         static char buf[32];
         snprintf(buf, sizeof(buf), "unsupported (%u)", policy_type);
