@@ -1468,6 +1468,9 @@ bool launch_kernel(bool is_measured_launch)
         if(!move_modules_above_elf_kernel(g_ldr_ctx, (elf_header_t *)kernel_image))
             return false;
 
+        /* launch succeeded, so clear error codes */
+        write_tb_error(TB_ERR_NONE);
+
         printk(TBOOT_INFO"transfering control to kernel @%p...\n", 
                kernel_entry_point);
         /* (optionally) pause when transferring to kernel */
@@ -1494,6 +1497,10 @@ bool launch_kernel(bool is_measured_launch)
         expand_linux_image(kernel_image, kernel_size,
                            initrd_image, initrd_size,
                            &kernel_entry_point, is_measured_launch);
+
+        /* launch succeeded, so clear error codes */
+        write_tb_error(TB_ERR_NONE);
+
         printk(TBOOT_INFO"transfering control to kernel @%p...\n", 
                kernel_entry_point);
         /* (optionally) pause when transferring to kernel */
