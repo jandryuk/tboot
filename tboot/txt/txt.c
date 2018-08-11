@@ -60,6 +60,7 @@
 #include <efi_memmap.h>
 #include <txt/txt.h>
 #include <txt/config_regs.h>
+#include <txt/errorcode.h>
 #include <txt/mtrrs.h>
 #include <txt/heap.h>
 #include <txt/acmod.h>
@@ -847,7 +848,7 @@ tb_error_t txt_launch_environment(loader_ctx *lctx)
                              g_mle_hdr.mle_start_off + TBOOT_BASE_ADDR,
                              g_mle_hdr.mle_end_off - g_mle_hdr.mle_start_off);
     if ( mle_ptab_base == NULL )
-        return TB_ERR_FATAL;
+        return TB_ERR_GENERIC;
 
     configure_vtd();
 
@@ -860,7 +861,8 @@ tb_error_t txt_launch_environment(loader_ctx *lctx)
     os_mle_data = get_os_mle_data_start(txt_heap);
     save_mtrrs(&(os_mle_data->saved_mtrr_state));
 
-    /* set MTRRs properly for AC module (SINIT) */
+    /* set MTRRs properly for AC module (SINIT); if this fails the MTRRs may
+       not be in a good state to continue a launch, so return TB_ERR_FATAL */
     if ( !set_mtrrs_for_acmod(g_sinit) )
         return TB_ERR_FATAL;
 
