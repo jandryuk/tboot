@@ -109,6 +109,8 @@ typedef struct __packed {
     uint32_t  flags;
     uint64_t  ap_wake_addr;      /* phys addr of kernel/VMM SIPI vector */
     uint32_t  ap_wake_trigger;   /* kernel/VMM writes APIC ID to wake AP */
+    uint64_t  evt_log_size;      /* size of e820 TPM event log(s) region */
+    uint64_t  evt_log_region;    /* e820 region containing TPM event log(s) */
 } tboot_shared_t;
 
 #define TB_SHUTDOWN_REBOOT      0
@@ -163,6 +165,8 @@ static inline void print_tboot_shared(const tboot_shared_t *tboot_shared)
     printk(TBOOT_DETA"\t flags: 0x%8.8x\n", tboot_shared->flags);
     printk(TBOOT_DETA"\t ap_wake_addr: 0x%08x\n", (uint32_t)tboot_shared->ap_wake_addr);
     printk(TBOOT_DETA"\t ap_wake_trigger: %u\n", tboot_shared->ap_wake_trigger);
+    printk(TBOOT_DETA"\t evt_log_region: 0x%llx\n", tboot_shared->evt_log_region);
+    printk(TBOOT_DETA"\t evt_log_size: 0x%llx\n", tboot_shared->evt_log_size);
 }
 
 #endif    /* __TBOOT_H__ */
