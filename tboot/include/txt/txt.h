@@ -62,6 +62,7 @@ extern void txt_shutdown(void);
 extern bool txt_is_powercycle_required(void);
 extern void ap_wait(unsigned int cpuid);
 extern int get_evtlog_type(void);
+void export_evtlog(uint64_t *log, uint64_t *size, uint8_t *format);
 
 extern uint32_t g_using_da;
 #endif      /* __TXT_TXT_H__ */
