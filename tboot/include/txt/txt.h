@@ -55,6 +55,7 @@ extern void display_last_boot_error(void);
 extern void txt_shutdown(void);
 extern bool txt_is_powercycle_required(void);
 extern void ap_wait(unsigned int cpuid);
+void export_evtlog(uint64_t *log, uint64_t *size);
 
 extern uint32_t g_using_da;
 #endif      /* __TXT_TXT_H__ */
