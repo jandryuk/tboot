@@ -215,6 +215,15 @@ static void post_launch(void)
     if ( !e820_protect_region(base, size, mem_type) )      
         apply_policy(TB_ERR_FATAL);
 
+    /* if using memory logging, reserve log area */
+    if ( g_log_targets & TBOOT_LOG_TARGET_MEMORY ) {
+        base = TBOOT_SERIAL_LOG_ADDR;
+        size = TBOOT_SERIAL_LOG_SIZE;
+        printk(TBOOT_INFO"reserving tboot memory log (%Lx - %Lx) in e820 table\n", base, (base + size - 1));
+        if ( !e820_protect_region(base, size, E820_RESERVED) )         
+            apply_policy(TB_ERR_FATAL);
+    }
+
     /*
      * verify modules against policy
      */
@@ -258,6 +267,17 @@ static void post_launch(void)
     else if ( get_tboot_mwait() ) {
         printk(TBOOT_ERR"ap_wake_mwait specified but the CPU doesn't support it.\n");
     }
+
+    /*
+     * export tpm event log
+     */
+    export_evtlog(&_tboot_shared.evt_log_region, &_tboot_shared.evt_log_size);
+
+    /* replace map in loader context with copy */
+    replace_e820_map(g_ldr_ctx);
+
+    printk(TBOOT_DETA"adjusted e820 map:\n");
+    print_e820_map();
 
     print_tboot_shared(&_tboot_shared);
 
