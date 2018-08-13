@@ -639,8 +639,15 @@ void shutdown(void)
         /* have TPM save static PCRs (in case VMM/kernel didn't) */
         /* per TCG spec, TPM can invalidate saved state if any other TPM
            operation is performed afterwards--so do this last */
-        if ( _tboot_shared.shutdown_type == TB_SHUTDOWN_S3 )
+        if ( _tboot_shared.shutdown_type == TB_SHUTDOWN_S3 ) {
             tpm_fp->save_state(tpm, tpm->cur_loc);
+        } else if ( _tboot_shared.shutdown_type == TB_SHUTDOWN_REBOOT ||
+                   _tboot_shared.shutdown_type == TB_SHUTDOWN_HALT ||
+                   _tboot_shared.shutdown_type == TB_SHUTDOWN_S5) {
+           if(tpm->major == TPM20_VER_MAJOR){
+               tpm_fp->shutdown(tpm, tpm->cur_loc);
+           }
+        }
 
         /* scrub any secrets by clearing their memory, then flush cache */
         /* we don't have any secrets to scrub, however */
