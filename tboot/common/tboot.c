@@ -680,6 +680,12 @@ void shutdown(void)
             if (tpm_fp->save_state(tpm, tpm->cur_loc) != 0) {
                 printk(TBOOT_ERR"failed to save TPM state\n");
             }
+        } else if ( _tboot_shared.shutdown_type == TB_SHUTDOWN_REBOOT ||
+                    _tboot_shared.shutdown_type == TB_SHUTDOWN_HALT ||
+                    _tboot_shared.shutdown_type == TB_SHUTDOWN_S5 ) {
+           if ( tpm->major == TPM20_VER_MAJOR ) {
+               tpm_fp->shutdown(tpm, tpm->cur_loc);
+           }
         }
 
         /* scrub any secrets by clearing their memory, then flush cache */
