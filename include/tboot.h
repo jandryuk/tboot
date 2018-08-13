@@ -109,6 +109,14 @@ typedef struct __packed {
     uint32_t  flags;
     uint64_t  ap_wake_addr;      /* phys addr of kernel/VMM SIPI vector */
     uint32_t  ap_wake_trigger;   /* kernel/VMM writes APIC ID to wake AP */
+    uint64_t  evt_log_size;      /* size of e820 TPM event log(s) region */
+    uint64_t  evt_log_region;    /* e820 region containing TPM event log(s) */
+
+#define TB_EVTLOG_FORMAT_UNKNOWN    0x0
+#define TB_EVTLOG_FORMAT_TCG_12     0x1
+#define TB_EVTLOG_FORMAT_LEGACY_20  0x2
+#define TB_EVTLOG_FORMAT_TCG_20     0x3
+    uint8_t   evt_log_format;    /* TPM event log(s) format. */
 } tboot_shared_t;
 
 #define TB_SHUTDOWN_REBOOT      0
@@ -149,6 +157,16 @@ static inline bool tboot_in_measured_env(void)
 {
     return (g_tboot_shared != NULL);
 }
+
+#if __WORDSIZE == 64
+# define __PRI64_PREFIX	"l"
+# define __PRIPTR_PREFIX	"l"
+#else
+# define __PRI64_PREFIX	"ll"
+# define __PRIPTR_PREFIX
+#endif
+#define PRIu64		__PRI64_PREFIX "u"
+#define PRIx64		__PRI64_PREFIX "x"
 
 #endif    /* __TBOOT_H__ */
 
