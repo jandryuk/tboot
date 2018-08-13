@@ -529,6 +529,11 @@ void get_tboot_extpol(void)
         tpm->extpol = TB_EXTPOL_FIXED;
         tpm->cur_alg = TB_HALG_SM3;
     }
+
+    if ( tpm->major == TPM20_VER_MAJOR ) {
+        tpm->extpol = TB_EXTPOL_FIXED;
+        tpm->cur_alg = TB_HALG_SHA256;
+    }
 }
 
 bool get_tboot_force_tpm2_legacy_log(void)
