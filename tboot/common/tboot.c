@@ -193,6 +193,9 @@ static void post_launch(void)
     if ( !verify_modules(g_ldr_ctx) )
         apply_policy(TB_ERR_POST_LAUNCH_VERIFICATION);
 
+    /* mark iomem regions of TPM as E820_RESERVED. */
+    tpm_protect_mem_regions();
+
     /* verify that tboot is in valid RAM (i.e. E820_RAM) */
     base = (uint64_t)TBOOT_BASE_ADDR;
     size = (uint64_t)((unsigned long)&_end - base);
