@@ -374,6 +374,43 @@ bool evtlog_append_tpm12(uint8_t pcr, tb_hash_t *hash, uint32_t type)
     return true;
 }
 
+void export_evtlog_tpm12(uint64_t *log, uint64_t *size)
+{
+    uint64_t ram_start, ram_size;
+    uint64_t reserve;
+    void *src, *dst;
+
+    if ( g_elog == NULL )
+        goto fail;
+
+    src = (void *) g_elog;
+
+    *size = sizeof(event_log_container_t) +
+        (g_elog->next_event_offset - g_elog->pcr_events_offset);
+    if (*size < sizeof(event_log_container_t))
+        goto fail;
+
+    reserve = PAGE_UP(*size);
+    if (!efi_memmap_get_highest_sized_ram(reserve, 0x100000000ULL, &ram_start, &ram_size))
+        if (!e820_get_highest_sized_ram(reserve, 0x100000000ULL, &ram_start, &ram_size))
+            goto fail;
+
+    *log = (ram_start + ram_size) - reserve;
+    dst = (void *)(uint32_t) *log;
+
+    tb_memcpy(dst, src, *size);
+
+    if (! e820_reserve_ram(*log, reserve))
+        goto fail;
+
+    return;
+
+fail:
+    *log = 0;
+    *size = 0;
+    return;
+}
+
 void dump_event_2(void)
 {
     heap_event_log_descr_t *log_descr;
@@ -479,8 +516,7 @@ bool evtlog_append_tpm2_tcg(uint8_t pcr, uint32_t type, hash_list_t *hl)
         return false;
     }
 
-    event = (tcg_pcr_event2*)(void *)(unsigned long)g_elog_2_1->phys_addr +
-        g_elog_2_1->next_record_offset;
+    event = (tcg_pcr_event2*)(uintptr_t)(g_elog_2_1->phys_addr + g_elog_2_1->next_record_offset);
     event->pcr_index = pcr;
     event->event_type = type;
     event->event_size = 0;  // No event data passed by tboot.
@@ -499,6 +535,121 @@ bool evtlog_append_tpm2_tcg(uint8_t pcr, uint32_t type, hash_list_t *hl)
     g_elog_2_1->next_record_offset += event_size;
     print_event_2_1(event);
     return true;
+}
+
+static void export_evtlog_tpm20_legacy(uint64_t *log, uint64_t *size)
+{
+    size_t copied = 0;
+    size_t count = 0;
+    uint64_t ram_start, ram_size;
+    uint64_t reserve;
+    void *curr = NULL;
+    heap_event_log_descr_t *log_desc = NULL;
+
+    if ( g_elog_2 == NULL )
+        goto fail;
+
+    *size = 0;
+    for ( unsigned int i=0; i<g_elog_2->count; i++ ) {
+        log_desc = &g_elog_2->event_log_descr[i];
+
+        *size += sizeof(heap_event_log_descr_t) +
+            (log_desc->next_event_offset - log_desc->pcr_events_offset);
+    }
+
+    if ( *size < sizeof(heap_event_log_descr_t) )
+        goto fail;
+
+    reserve = PAGE_UP(*size);
+    if (!efi_memmap_get_highest_sized_ram(reserve, 0x100000000ull, &ram_start, &ram_size))
+        if (!e820_get_highest_sized_ram(reserve, 0x100000000ull, &ram_start, &ram_size))
+            goto fail;
+
+    /* place log as the last n pages of ram section */
+    *log = (ram_start + ram_size) - reserve;
+
+    curr = (void *)(uint32_t) *log;
+
+    for ( unsigned int i=0; i<g_elog_2->count; i++ ) {
+        void *src;
+
+        log_desc = &g_elog_2->event_log_descr[i];
+
+        /* copy the log descriptor */
+        count = sizeof(heap_event_log_descr_t);
+        if ( *size < (copied + count) )
+            goto fail;
+        tb_memcpy(curr, log_desc, count);
+
+        curr += count;
+        copied += count;
+
+        /* copy the log */
+        count = log_desc->next_event_offset - log_desc->pcr_events_offset;
+        if ( *size < (copied + count) )
+            goto fail;
+        src = (void *)(uint32_t)(log_desc->phys_addr +
+                log_desc->pcr_events_offset);
+        if ( count > 0 ) {
+            tb_memcpy(curr, src, count);
+            curr += count;
+            copied += count;
+        }
+    }
+
+    if ( copied == 0 )
+        goto fail;
+
+    if (! e820_reserve_ram(*log, reserve) )
+        goto fail;
+
+
+    return;
+
+fail:
+    *log = 0;
+    *size = 0;
+    return;
+}
+
+static void export_evtlog_tpm20_tcg(uint64_t *log, uint64_t *size)
+{
+    void *elog_record_start;
+    uint64_t ram_start, ram_size, reserve;
+    void *curr;
+
+    if ( g_elog_2_1 == NULL )
+        goto fail;
+
+    if ( g_elog_2_1->first_record_offset == g_elog_2_1->next_record_offset )
+        goto fail;
+
+    /* Get the size needed for allocation. */
+    *size = g_elog_2_1->next_record_offset - g_elog_2_1->first_record_offset;
+    reserve = PAGE_UP(*size);
+
+    /* Find a RAM region below 4G. */
+    if (!efi_memmap_get_highest_sized_ram(reserve, 0x100000000ULL, &ram_start, &ram_size))
+        if (!e820_get_highest_sized_ram(reserve, 0x100000000ULL, &ram_start, &ram_size))
+            goto fail;
+
+    /* Log in the last n pages of the RAM section. */
+    *log = ram_start + ram_size - reserve;
+
+    curr = (void*)(uintptr_t)(*log);
+    elog_record_start = (void*)(uintptr_t)(g_elog_2_1->phys_addr + g_elog_2_1->first_record_offset);
+    tb_memcpy(curr, elog_record_start, *size);
+
+    /* Mark the eventlog region as reserved. */
+    if ( !e820_reserve_ram(*log, reserve) )
+        goto fail;
+
+    return;
+
+fail:
+    *log = 0;
+    *size = 0;
+    return;
 }
 
 bool evtlog_append(uint8_t pcr, hash_list_t *hl, uint32_t type)
@@ -525,6 +676,28 @@ bool evtlog_append(uint8_t pcr, hash_list_t *hl, uint32_t type)
     }
 
     return true;
+}
+
+void export_evtlog(uint64_t *log, uint64_t *size, uint8_t *format)
+{
+    *format = get_evtlog_type();
+
+    switch (*format) {
+        case EVTLOG_TPM12:
+            export_evtlog_tpm12(log, size);
+            break;
+        case EVTLOG_TPM2_LEGACY:
+            export_evtlog_tpm20_legacy(log, size);
+            break;
+        case EVTLOG_TPM2_TCG:
+            export_evtlog_tpm20_tcg(log, size);
+            break;
+        default:
+            *log = 0;
+            *size = 0;
+            *format = 0;
+            break;
+    }
 }
 
 __data uint32_t g_using_da = 0;
