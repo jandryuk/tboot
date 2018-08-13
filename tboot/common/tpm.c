@@ -42,6 +42,10 @@
 #include <processor.h>
 #include <io.h>
 #include <string.h>
+#include <page.h>
+#include <uuid.h>
+#include <loader.h>
+#include <e820.h>
 #include <tpm.h>
 #include <sha1.h>
 
@@ -914,6 +918,36 @@ const struct tpm_if_fp *get_tpm_fp(void)
     return NULL;
 
 }
+
+void tpm_protect_mem_regions(void)
+{
+    /* TPM specification defines one region @0xfed40000-0xfed44fff.
+     * Given a 32bits dom0 with "enough" memory (dom_mem=>4G), it is likely
+     * that the kernel will try to use every last region for RAM, even in upper
+     * 32bit regions.
+     * For some reason, the BIOS does not report that region in the e820 as
+     * reserved. It is only reported in one of the SSDT.
+     * There is many way to deal with that problem:
+     * - add memmap=0x5000$0xfed40000 to Linux (dom0) cmdline
+     * - patch Linux dom0 memory layout management to leave that region alone.
+     * - Have the tpm_tis driver ioremap that region without checking if the
+     *   kernel used it for something else (devm_ioremap() instead of
+     *   devm_ioremap_resource(), the later being used since around 4.6).
+     * - Or have tboot change the e820 to mark that region reserved...
+     */
+    uint64_t base = TPM_LOCALITY_BASE;
+    uint64_t size = (NR_TPM_LOCALITY_PAGES * TPM_NR_LOCALITIES) << PAGE_SHIFT;
+
+    printk(TBOOT_INFO"Marking TPM region [%#llx-%#llx] as reserved...\n",
+           base, base + size - 1);
+    if ( !e820_protect_region(base, size, E820_RESERVED) )
+        printk(TBOOT_WARN"TPM region [%#llx-%#llx] is not reserved.\n",
+               base, base + size - 1);
+    if ( !efi_memmap_reserve(base, size) )
+        printk(TBOOT_WARN"TPM EFI memmap [%#llx-%#llx] is not reserved.\n",
+               base, base + size - 1);
+}
+
 /*
  * Local variables:
  * mode: C
