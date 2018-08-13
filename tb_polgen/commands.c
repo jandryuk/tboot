@@ -128,7 +128,7 @@ bool do_create(const param_data_t *params)
 
     /* if file does not exist then create empty policy */
     if ( !existing_policy )
-        new_policy(params->policy_type, params->policy_control);
+        new_policy(params->policy_type, params->policy_control, params->hash_alg);
     else
         modify_policy(params->policy_type, params->policy_control);
 
