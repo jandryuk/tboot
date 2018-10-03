@@ -88,6 +88,7 @@ extern void apply_policy(tb_error_t error);
 extern void cpu_wakeup(uint32_t cpuid, uint32_t sipi_vec);
 extern void print_event(const tpm12_pcr_event_t *evt);
 extern void print_event_2(void *evt, uint16_t alg);
+extern void nmi_enable(void);
 
 
 /*
@@ -759,6 +760,10 @@ static void txt_wakeup_cpus(void)
     printk(TBOOT_DETA"enabling SMIs on BSP\n");
     __getsec_smctrl();
 
+    /* enable NMIs on BSP. */
+    printk(TBOOT_DETA"enabling NMIs on BSP\n");
+    nmi_enable();
+
     atomic_set(&ap_wfs_count, 0);
 
     /* RLPs will use our GDT and CS */
@@ -1220,6 +1225,10 @@ void txt_cpu_wakeup(void)
     /* enable SMIs */
     printk(TBOOT_DETA"enabling SMIs on cpu %u\n", cpuid);
     __getsec_smctrl();
+
+    /* enable NMIs. */
+    printk(TBOOT_DETA"enabling NMIs on cpu %u\n", cpuid);
+    nmi_enable();
 
     atomic_inc(&ap_wfs_count);
     if ( use_mwait() )
