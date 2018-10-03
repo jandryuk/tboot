@@ -303,6 +303,20 @@ ENTRY(_prot_to_real)
 	ADDR16
 	ljmp    *_real_mode_entry_point
 
+/* Entry point to (re-)enable NMI.
+ */
+ENTRY(nmi_enable)
+	/* An IRET-to-self can be used to unmask NMIs */
+	push %eax
+	leal .Lnmi_enable_done, %eax
+	pushfl
+	pushl $(cs_sel)
+	pushl %eax
+	iret
+.Lnmi_enable_done:
+	pop %eax
+	ret
+
 /*
  * interrupt handler
  */
