@@ -140,7 +140,15 @@ ENTRY(_post_launch_entry)
 	and $PAGE_MASK, %ebx      /* ...rounded to page start */
 	/* are they equal? */
 	cmp %ebx, %eax
-	je __start                /* yes, so continue with normal launch */
+	jne layout_err		  /* no, report error and give up. */
+
+	/* An IRET-to-self can be used to unmask NMIs which SENTER masked.
+	 * Xen requires NMI unmasked to handle live-patching. */
+	leal __start, %edx
+	pushfl
+	pushl $(cs_sel)
+	pushl %edx
+	iret
 
 layout_err:       /* layout check failed so TXT RESET */
 	                /* unlock memory config (and serialize) */
