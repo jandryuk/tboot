@@ -78,41 +78,42 @@ bool are_hashes_equal(const tb_hash_t *hash1, const tb_hash_t *hash2,
 bool hash_buffer(const unsigned char* buf, size_t size, tb_hash_t *hash,
 		 uint16_t hash_alg)
 {
+    EVP_MD_CTX *ctx;
+    const EVP_MD *md;
+    bool ret = false;
+
     if ( hash == NULL )
         return false;
 
-    if ( hash_alg == TB_HALG_SHA1 ) {
-        EVP_MD_CTX ctx;
-        const EVP_MD *md;
+    ctx = EVP_MD_CTX_create();
+    if ( ctx == NULL )
+        return false;
 
+    if ( hash_alg == TB_HALG_SHA1 ) {
         md = EVP_sha1();
-        EVP_DigestInit(&ctx, md);
-        EVP_DigestUpdate(&ctx, buf, size);
-        EVP_DigestFinal(&ctx, hash->sha1, NULL);
-        return true;
+        EVP_DigestInit(ctx, md);
+        EVP_DigestUpdate(ctx, buf, size);
+        EVP_DigestFinal(ctx, hash->sha1, NULL);
+        ret = true;
     }
     else if (hash_alg == TB_HALG_SHA256) {
-        EVP_MD_CTX ctx;
-        const EVP_MD *md;
-
         md = EVP_sha256();
-        EVP_DigestInit(&ctx, md);
-        EVP_DigestUpdate(&ctx, buf, size);
-        EVP_DigestFinal(&ctx, hash->sha256, NULL);
-        return true;
+        EVP_DigestInit(ctx, md);
+        EVP_DigestUpdate(ctx, buf, size);
+        EVP_DigestFinal(ctx, hash->sha256, NULL);
+        ret = true;
     }
     else if (hash_alg == TB_HALG_SHA384) {
-        EVP_MD_CTX ctx;
-        const EVP_MD *md;
-
         md = EVP_sha384();
-        EVP_DigestInit(&ctx, md);
-        EVP_DigestUpdate(&ctx, buf, size);
-        EVP_DigestFinal(&ctx, hash->sha384, NULL);
-        return true;
+        EVP_DigestInit(ctx, md);
+        EVP_DigestUpdate(ctx, buf, size);
+        EVP_DigestFinal(ctx, hash->sha384, NULL);
+        ret = true;
     }
-    else
-        return false;
+
+    EVP_MD_CTX_destroy(ctx);
+
+    return ret;
 }
 
 /*
@@ -124,36 +125,39 @@ bool hash_buffer(const unsigned char* buf, size_t size, tb_hash_t *hash,
 bool extend_hash(tb_hash_t *hash1, const tb_hash_t *hash2, uint16_t hash_alg)
 {
     uint8_t buf[2*sizeof(tb_hash_t)];
+    EVP_MD_CTX *ctx;
+    const EVP_MD *md;
+    bool ret = false;
 
     if ( hash1 == NULL || hash2 == NULL )
         return false;
 
-    if ( hash_alg == TB_HALG_SHA1 ) {
-        EVP_MD_CTX ctx;
-        const EVP_MD *md;
+    ctx = EVP_MD_CTX_create();
+    if ( ctx == NULL )
+        return false;
 
+    if ( hash_alg == TB_HALG_SHA1 ) {
         memcpy(buf, &(hash1->sha1), sizeof(hash1->sha1));
         memcpy(buf + sizeof(hash1->sha1), &(hash2->sha1), sizeof(hash1->sha1));
         md = EVP_sha1();
-        EVP_DigestInit(&ctx, md);
-        EVP_DigestUpdate(&ctx, buf, 2*sizeof(hash1->sha1));
-        EVP_DigestFinal(&ctx, hash1->sha1, NULL);
-        return true;
+        EVP_DigestInit(ctx, md);
+        EVP_DigestUpdate(ctx, buf, 2*sizeof(hash1->sha1));
+        EVP_DigestFinal(ctx, hash1->sha1, NULL);
+        ret = true;
     }
     else if (hash_alg == TB_HALG_SHA256) {
-        EVP_MD_CTX ctx;
-        const EVP_MD *md;
-
         memcpy(buf, &(hash1->sha256), sizeof(hash1->sha256));
         memcpy(buf + sizeof(hash1->sha256), &(hash2->sha256), sizeof(hash1->sha256));
         md = EVP_sha256();
-        EVP_DigestInit(&ctx, md);
-        EVP_DigestUpdate(&ctx, buf, 2*sizeof(hash1->sha256));
-        EVP_DigestFinal(&ctx, hash1->sha256, NULL);
-        return true;
+        EVP_DigestInit(ctx, md);
+        EVP_DigestUpdate(ctx, buf, 2*sizeof(hash1->sha256));
+        EVP_DigestFinal(ctx, hash1->sha256, NULL);
+        ret = true;
     }
-    else
-        return false;
+
+    EVP_MD_CTX_destroy(ctx);
+
+    return ret;
 }
 
 void print_hash(const tb_hash_t *hash, uint16_t hash_alg)
