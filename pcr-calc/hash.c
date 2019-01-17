@@ -38,6 +38,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <safe_lib.h>
 #include <openssl/evp.h>
 #define PRINT   printf
 #include "../include/config.h"
@@ -52,21 +53,38 @@
 bool are_hashes_equal(const tb_hash_t *hash1, const tb_hash_t *hash2,
 		      uint16_t hash_alg)
 {
+    int diff;
+    errno_t err;
+    rsize_t len;
+
     if ( ( hash1 == NULL ) || ( hash2 == NULL ) )
         return false;
 
-    if ( hash_alg == TB_HALG_SHA1 )
-        return (memcmp(hash1, hash2, SHA1_LENGTH) == 0);
-    else if ( hash_alg == TB_HALG_SHA256 )
-        return (memcmp(hash1, hash2, SHA256_LENGTH) == 0);
-    else if ( hash_alg == TB_HALG_SM3 )
-        return (memcmp(hash1, hash2, SM3_LENGTH) == 0);
-    else if ( hash_alg == TB_HALG_SHA384 )
-        return (memcmp(hash1, hash2, SHA384_LENGTH) == 0);
-    else if ( hash_alg == TB_HALG_SHA512 )
-        return (memcmp(hash1, hash2, SHA512_LENGTH) == 0);
-    else
+    switch ( hash_alg ) {
+        case TB_HALG_SHA1:
+            len = SHA1_LENGTH;
+            break;
+        case TB_HALG_SHA256:
+            len = SHA256_LENGTH;
+            break;
+        case TB_HALG_SM3:
+            len = SM3_LENGTH;
+            break;
+        case TB_HALG_SHA384:
+            len = SHA384_LENGTH;
+            break;
+        case TB_HALG_SHA512:
+            len = SHA512_LENGTH;
+            break;
+        default:
+            return false;
+    }
+
+    err = memcmp_s(hash1, sizeof(tb_hash_t), hash2, len, &diff);
+    if ( err )
         return false;
+
+    return !diff;
 }
 
 /*
@@ -137,8 +155,9 @@ bool extend_hash(tb_hash_t *hash1, const tb_hash_t *hash2, uint16_t hash_alg)
         return false;
 
     if ( hash_alg == TB_HALG_SHA1 ) {
-        memcpy(buf, &(hash1->sha1), sizeof(hash1->sha1));
-        memcpy(buf + sizeof(hash1->sha1), &(hash2->sha1), sizeof(hash1->sha1));
+        memcpy_s(buf, sizeof(buf), &(hash1->sha1), sizeof(hash1->sha1));
+        memcpy_s(buf + sizeof(hash1->sha1), sizeof(buf) - sizeof(hash1->sha1),
+                 &(hash2->sha1), sizeof(hash1->sha1));
         md = EVP_sha1();
         EVP_DigestInit(ctx, md);
         EVP_DigestUpdate(ctx, buf, 2*sizeof(hash1->sha1));
@@ -146,8 +165,9 @@ bool extend_hash(tb_hash_t *hash1, const tb_hash_t *hash2, uint16_t hash_alg)
         ret = true;
     }
     else if (hash_alg == TB_HALG_SHA256) {
-        memcpy(buf, &(hash1->sha256), sizeof(hash1->sha256));
-        memcpy(buf + sizeof(hash1->sha256), &(hash2->sha256), sizeof(hash1->sha256));
+        memcpy_s(buf, sizeof(buf), &(hash1->sha256), sizeof(hash1->sha256));
+        memcpy_s(buf + sizeof(hash1->sha256), sizeof(buf) - sizeof(hash1->sha256),
+                 &(hash2->sha256), sizeof(hash1->sha256));
         md = EVP_sha256();
         EVP_DigestInit(ctx, md);
         EVP_DigestUpdate(ctx, buf, 2*sizeof(hash1->sha256));
@@ -197,7 +217,7 @@ void copy_hash(tb_hash_t *dest_hash, const tb_hash_t *src_hash,
 
     len = get_hash_size(hash_alg);
     if ( len > 0 )
-        memcpy(dest_hash, src_hash, len);
+        memcpy_s(dest_hash, sizeof(tb_hash_t), src_hash, len);
     else
         printf("unsupported hash alg (%u)\n", hash_alg);
 }

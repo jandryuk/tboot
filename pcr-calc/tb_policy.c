@@ -38,6 +38,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <safe_lib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -61,8 +62,8 @@ tb_hash_t *tb_policy_hash(tb_policy_t *pol, size_t size, uint16_t alg)
 	if (!hash)
 		goto out;
 
-	memset(buf, 0, sizeof(buf));
-	memcpy(buf, &pol->policy_control, sizeof(pol->policy_control));
+	memset_s(buf, sizeof(buf), 0);
+	memcpy_s(buf, sizeof(buf), &pol->policy_control, sizeof(pol->policy_control));
 
 	if ( pol->policy_control & TB_POLCTL_EXTEND_PCR17 )
 		if ( !hash_buffer((unsigned char *)pol, size,

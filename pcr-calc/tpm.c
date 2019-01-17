@@ -34,7 +34,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <memory.h>
+#include <string.h>
+#include <safe_lib.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -76,7 +77,7 @@ bool pcr_recalculate(struct pcr *p, uint16_t alg)
 	if (p->log_idx == 0)
 		return true;
 
-	memset(&p->value, 0, sizeof(tb_hash_t));
+	memset_s(&p->value, sizeof(tb_hash_t), 0);
 
 	for (i = 0; i < p->log_idx; i++) {
 		struct pcr_event *e = &p->log[i];
@@ -85,11 +86,11 @@ bool pcr_recalculate(struct pcr *p, uint16_t alg)
 
 		if (e->type == TPM_EVT_HASH_START) {
 			if (extend_hash_start()) {
-				memset(&p->value, 0, sizeof(tb_hash_t));
+				memset_s(&p->value, sizeof(tb_hash_t), 0);
 				if (!extend_hash(&p->value, &e->digest, alg))
 					return false;
 			} else {
-				memcpy(&p->value, &e->digest, sizeof(tb_hash_t));
+				memcpy_s(&p->value, sizeof(tb_hash_t), &e->digest, sizeof(tb_hash_t));
 			}
 		} else if (!extend_hash(&p->value, &e->digest, alg)) {
 			return false;
@@ -115,7 +116,7 @@ bool pcr_record_event(struct pcr *p, uint16_t alg, uint32_t type,
 
 	if (type == TPM_EVT_HASH_START) {
 		if (extend_hash_start()) {
-			memset(&p->value, 0, sizeof(tb_hash_t));
+			memset_s(&p->value, sizeof(tb_hash_t), 0);
 			if (!extend_hash(&p->value, hash, alg)) {
 				error_msg("failed to extend PCR%d with hash\n",
 					p->num);
@@ -123,7 +124,7 @@ bool pcr_record_event(struct pcr *p, uint16_t alg, uint32_t type,
 			}
 
 		} else {
-			memcpy(&p->value, hash, sizeof(tb_hash_t));
+			memcpy_s(&p->value, sizeof(tb_hash_t), hash, sizeof(tb_hash_t));
 		}
 	} else if (!extend_hash(&p->value, hash, alg)) {
 		error_msg("failed to extend PCR%d with hash\n", p->num);
@@ -132,7 +133,7 @@ bool pcr_record_event(struct pcr *p, uint16_t alg, uint32_t type,
 
 	evt = &p->log[p->log_idx];
 	evt->type = type;
-	memcpy(&evt->digest, hash, sizeof(tb_hash_t));
+	memcpy_s(&evt->digest, sizeof(tb_hash_t), hash, sizeof(tb_hash_t));
 	p->log_idx++;
 
 	return true;
@@ -329,7 +330,7 @@ bool tpm_clear_all_event(struct tpm *t, uint16_t alg, uint32_t evt_type)
 
 		for (j = 0; j < p->log_idx; j++) {
 			if (p->log[j].type == evt_type)
-				memset(&p->log[j], 0, sizeof(struct pcr_event));
+				memset_s(&p->log[j], sizeof(struct pcr_event), 0);
 		}
 	}
 
@@ -366,17 +367,24 @@ void tpm_print(struct tpm *t, uint16_t alg)
 	struct pcr_bank *bank;
 	tb_hash_t null_hash;
 
-	if (!t) {
+	if (!t)
 		return;
-	}
 
 	bank = &(t->banks[bnum]);
 
-	memset(&null_hash, 0, sizeof(tb_hash_t));
+	memset_s(&null_hash, sizeof(tb_hash_t), 0);
 
 	for (i = 0; i < MAX_PCR; i++) {
-		if (memcmp(&(bank->pcrs[i].value),
-		    &null_hash, sizeof(tb_hash_t)) == 0)
+		int diff;
+		errno_t err;
+
+		err = memcmp_s(&(bank->pcrs[i].value), sizeof(tb_hash_t),
+				&null_hash, sizeof(tb_hash_t), &diff);
+		if (err) {
+			error_msg("Invalid value in PCR%d.", i);
+			break;
+		}
+		if (!diff)
 			continue;
 
 		printf("%02d:",bank->pcrs[i].num);
@@ -390,17 +398,24 @@ void tpm_dump(struct tpm *t, uint16_t alg)
 	struct pcr_bank *bank;
 	tb_hash_t null_hash;
 
-	if (!t) {
+	if (!t)
 		return;
-	}
 
 	bank = &(t->banks[bnum]);
 
-	memset(&null_hash, 0, sizeof(tb_hash_t));
+	memset_s(&null_hash, sizeof(tb_hash_t), 0);
 
 	for (i = 0; i < MAX_PCR; i++) {
-		if (memcmp(&bank->pcrs[i].value,
-		    &null_hash, sizeof(tb_hash_t)) == 0)
+		int diff;
+		errno_t err;
+
+		err = memcmp_s(&(bank->pcrs[i].value), sizeof(tb_hash_t),
+				&null_hash, sizeof(tb_hash_t), &diff);
+		if (err) {
+			error_msg("Invalid value in PCR%d.", i);
+			break;
+		}
+		if (!diff)
 			continue;
 
 		pcr_print(&bank->pcrs[i], alg);

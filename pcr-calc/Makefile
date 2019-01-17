@@ -15,7 +15,7 @@ TARGETS := pcr-calc module_hash
 
 CFLAGS += -D_LARGEFILE64_SOURCE
 
-LIBS += -lcrypto -lz
+LIBS += -lcrypto -lz $(ROOTDIR)/safestringlib/libsafestring.a
 
 ifdef HAVE_BZIP
 BZIP_LIB := -lbz2

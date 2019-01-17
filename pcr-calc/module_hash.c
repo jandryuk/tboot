@@ -40,6 +40,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <getopt.h>
+#include <safe_lib.h>
 #include <zlib.h>
 #include <sys/stat.h>
 #include <openssl/evp.h>
@@ -170,7 +171,7 @@ static bool read_module(const char *path, char **buffer, size_t *len, uint8_t fl
 	*buffer = malloc(*len);
 	if (*buffer == NULL)
 		goto fail_tmp;
-	memset(*buffer, 0, *len);
+	memset_s(*buffer, *len, 0);
 
 	if (fread(*buffer, 1, *len, tmpfd) != *len)
 		goto fail_buf;
@@ -283,7 +284,7 @@ static bool read_hash(const char *hexstr, tb_hash_t *hash, uint16_t hash_alg)
 	}
 
 	if (len == 1 && hexstr[0] == '0') {
-		memset(buf, 0, hash_length);
+		memset_s(buf, hash_length, 0);
 		return true;
 	}
 
