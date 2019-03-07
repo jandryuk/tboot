@@ -42,6 +42,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
+#include <safe_lib.h>
 
 #include "../include/hash.h"
 #include "uuid.h"
@@ -56,7 +57,7 @@ bool read_hash(const char *hexstr, tb_hash_t *hash)
 	unsigned char *buf = (unsigned char *)hash;
 
 	if (len == 1 && hexstr[0] == '0') {
-		memset(hash, 0, sizeof(tb_hash_t));
+		memset_s(hash, sizeof(tb_hash_t), 0);
 		return true;
 	}
 
@@ -151,6 +152,8 @@ int read_pcr_event(const char *s, struct pcr_event *evt)
 
 	if (len >= PCREVT_BUF_LEN)
 		return -1;
+
+	memset_s(&digest, sizeof (tb_hash_t), 0);
 
 	type = strtoul(s, &end, 0);
 	if (type == ULONG_MAX)
