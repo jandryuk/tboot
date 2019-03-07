@@ -321,33 +321,42 @@ static void print_help(void)
 int main(int argc, char *argv[])
 {
 	extern int optind;
-	int opt;
+	int opt, rc;
 	size_t mod_len;
 	char *module_path = NULL;
 	char *cmdline = NULL;
+	size_t cmdline_len;
 	char *ext_str = NULL;
+	size_t ext_str_len;
 	char *mod_buf = NULL;
 	uint16_t hash_alg = TB_HALG_SHA1;
 	uint8_t flags = NO_COMPRESSION;
 	tb_hash_t mod_hash, ext_hash;
+	errno_t err;
 
 	while ((opt = getopt(argc, (char ** const)argv, "he:c:a:jz")) != -1) {
 		switch (opt) {
 			case 'c':
-				cmdline = malloc(strlen(optarg) + 1);
+				cmdline_len = strlen(optarg);
+				cmdline = calloc(cmdline_len + 1, sizeof (char));
 				if ( cmdline == NULL ) {
 					printf("Out of memory\n");
 					return 1;
 				}
-				strcpy(cmdline, optarg);
+				err = strcpy_s(cmdline, cmdline_len + 1, optarg);
+				if (err != EOK)
+					return 1;
 			break;
 			case 'e':
-				ext_str = malloc(strlen(optarg) + 1);
+				ext_str_len = strlen(optarg);
+				ext_str = calloc(ext_str_len + 1, sizeof (char));
 				if ( ext_str == NULL ) {
 					printf("Out of memory\n");
 					return 1;
 				}
-				strcpy(ext_str, optarg);
+				err = strcpy_s(ext_str, ext_str_len + 1, optarg);
+				if (err != EOK)
+					return 1;
 			break;
 #ifdef HAVE_BZIP
 			case 'j':
@@ -378,13 +387,12 @@ int main(int argc, char *argv[])
 				free(cmdline);
 				return 1;
 			case 'a':
-				if (!strcmp(optarg, "sha1")) {
-					hash_alg = TB_HALG_SHA1;
-				} else if(!strcmp(optarg, "sha256")) {
+				hash_alg = TB_HALG_SHA1;
+				err = strcmp_s(optarg, sizeof ("sha256"), "sha256", &rc);
+				if (err != EOK)
+					return 1;
+				if (!rc)
 					hash_alg = TB_HALG_SHA256;
-				} else {
-					hash_alg = TB_HALG_SHA1;
-				}
 			break;
 			default:
 			break;
