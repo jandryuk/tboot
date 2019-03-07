@@ -46,6 +46,7 @@
 #include "../include/hash.h"
 #include "uuid.h"
 #include "tb_policy.h"
+#include "acm.h"
 #include "tpm.h"
 #include "util.h"
 #include "eventlog.h"
@@ -78,8 +79,10 @@ static void print_help(void) {
 		"\t-a alg Alogrithm: select what hash alogrithm to use.\n"
 		"\t-p policy_file Tboot Policy: the policy that was/will be used.\n"
 		"\t-m hash_str Multiboot Module: include module hash (MLE first).\n"
-		"\t-e evt_type:hash_str Override PCR events type found in the logs with the provided value.\n"
-		"\t-F file Use the given file as tpm event log (replace /sys/kernel/security/txt/*_binary_evtlog).\n");
+		"\t-e evt_type:<hash_str>|emulate Override PCR events type found in the logs with the provided value or emulate the value entirely (emulation requires TBoot version and ACM to be provided).\n"
+		"\t-F file Use the given file as tpm event log (replace /sys/kernel/security/txt/*_binary_evtlog).\n"
+		"\t-A acm-path Path to the ACM that will be used to emulate events for PCR calculations (see -e).\n"
+		"\t-V tboot-version TBoot version targeted to emulate events for PCR calculations (see -e)\n.");
 }
 
 static bool apply_lg_policy(struct tpm *t, tb_policy_t *policy, size_t pol_size,
@@ -195,18 +198,20 @@ out:
 
 int main(int argc, char *argv[]) {
 	extern int optind;
-	int opt, flags, mb_count = 0, evt_count = 0, ret = 0;
+	int opt, flags, i, mb_count = 0, evt_count = 0, ret = 0;
 	tb_hash_t mb[20] = { 0 };
 	struct pcr_event evt[20];
 	struct tpm *t = NULL;
 	uint16_t alg_override = 0;
 	size_t pol_size = 0;
 	tb_policy_t *policy_file = NULL;
+	struct acm *acm = NULL;
+	tb_version_t tbver = TB_199;
 	char *eventlog = NULL;
 
 	flags = FLAG_TPM12;
 
-	while ((opt = getopt(argc, (char ** const)argv, "h2dclvqa:p:m:e:F:")) != -1) {
+	while ((opt = getopt(argc, (char ** const)argv, "h2dclvqa:p:m:e:F:A:V:")) != -1) {
 		switch (opt) {
 			case 'm':
 				if (mb_count >= 20) {
@@ -278,6 +283,26 @@ int main(int argc, char *argv[]) {
 			case 'F':
 				eventlog = optarg;
 			break;
+			case 'A':
+				if (acm != NULL) {
+					error_msg("ACM path was already set.\n");
+					ret = 1;
+					goto out;
+				}
+				acm = acm_load(optarg);
+				if (!acm) {
+					error_msg("failed to load ACM:%s.\n", optarg);
+					ret = 1;
+					goto out;
+				}
+			break;
+			case 'V':
+				if (read_tboot_version(optarg, &tbver)) {
+					error_msg("invalid tboot version: %s.\n", optarg);
+					ret = 1;
+					goto out;
+				}
+			break;
 			case 'h':
 				print_help();
 				ret = 1;
@@ -345,9 +370,23 @@ int main(int argc, char *argv[]) {
 		goto out;
 	}
 
+	/* Event-type emulation sanity check. */
+	for (i = 0; i < evt_count; ++i)
+		if (evt[i].emulate && acm == NULL) {
+			error_msg("event-type emulation requires valid ACM passed as argument (-A).\n");
+			ret = 1;
+			goto out;
+		}
+
+
 	/* Change/Emulate events in the log according the cmdline. */
 	if (!tpm_substitute_all_events(t, t->alg, evt, evt_count)) {
 		error_msg("failed to apply event substitutions to the event log.\n");
+		ret = 1;
+		goto out;
+	}
+	if (!tpm_emulate_all_events(t, t->alg, evt, evt_count, acm, tbver)) {
+		error_msg("failed to emulate events in the event log.\n");
 		ret = 1;
 		goto out;
 	}
@@ -374,6 +413,9 @@ int main(int argc, char *argv[]) {
 out:
 	if (t != NULL)
 		destroy_tpm(t);
+
+	if (acm != NULL)
+		acm_unload(acm);
 
 	return ret;
 }

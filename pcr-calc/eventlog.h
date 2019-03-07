@@ -36,6 +36,24 @@
 #ifndef __EVENTLOG_H__
 #define __EVENTLOG_H__
 
+typedef enum {
+	EVTYPE_BASE                 = 0x400,
+	EVTYPE_PCRMAPPING           = EVTYPE_BASE + 1,
+	EVTYPE_HASH_START           = EVTYPE_BASE + 2,
+	EVTYPE_MLE_HASH             = EVTYPE_BASE + 4,
+	EVTYPE_BIOSAC_REG_DATA      = EVTYPE_BASE + 10,
+	EVTYPE_CPU_SCRTM_STAT       = EVTYPE_BASE + 11,
+	EVTYPE_LCP_CONTROL_HASH     = EVTYPE_BASE + 12,
+	EVTYPE_ELEMENTS_HASH        = EVTYPE_BASE + 13,
+	EVTYPE_STM_HASH             = EVTYPE_BASE + 14,
+	EVTYPE_OSSINITDATA_CAP_HASH = EVTYPE_BASE + 15,
+	EVTYPE_SINIT_PUBKEY_HASH    = EVTYPE_BASE + 16,
+	EVTYPE_LCP_HASH             = EVTYPE_BASE + 17,
+} txt_event_type_t;
+
+int emulate_event(const struct acm *acm, uint16_t alg, uint8_t tpmver,
+	tb_version_t tbver, struct pcr_event *evt);
+
 struct tpm *parse_tpm12_log(char *buffer, size_t size);
 struct tpm *parse_tpm20_log(char *buffer, size_t size);
 

@@ -46,6 +46,7 @@
 
 #include "../include/hash.h"
 #include "uuid.h"
+#include "acm.h"
 #include "tpm.h"
 
 #define error_msg(fmt, ...)         fprintf(stderr, fmt, ##__VA_ARGS__)
@@ -138,9 +139,10 @@ out:
 
 /*
  * Parse a string representing a pcr event.
- * Format: <event-id>:<hash>
+ * Format: <event-id>:<hash>|"emulate"
  * e.g, for sha256: '0x40f:5a3e80a37915b1601c363acd1601df7ef257d5d32c664004a2ec0484a4f60628'
  * e.g, for sha512: '0x40f:be688838ca8686e5c90689bf2ab585cef1137c999b48c70b92f67a5c34dc15697b5d11c982ed6d71be1e1e7f7b4e0733884aa97c3f7a339a8ed03577cf74be09
+ * e.g, for emulation: '0x40f:emulate'
  */
 #define PCREVT_BUF_LEN 135
 int read_pcr_event(const char *s, struct pcr_event *evt)
@@ -149,6 +151,7 @@ int read_pcr_event(const char *s, struct pcr_event *evt)
 	char *end = NULL;
 	unsigned long type;
 	tb_hash_t digest;
+	int rc;
 
 	if (len >= PCREVT_BUF_LEN)
 		return -1;
@@ -161,10 +164,33 @@ int read_pcr_event(const char *s, struct pcr_event *evt)
 	if (!end || *end != ':' || s == end)
 		return -1;
 
-	if (!read_hash(&end[1], &digest))
+	if (strcmp_s(&end[1], sizeof ("emulate"), "emulate", &rc) == EOK && !rc)
+		evt->emulate = 1;
+	else if (read_hash(&end[1], &digest))
+		evt->emulate = 0;
+	else
 		return -1;
 
 	evt->type = type;
 	evt->digest = digest;
 	return len;
+}
+
+#define TBVER_BUF_LEN 9
+int read_tboot_version(const char *s, tb_version_t *ver)
+{
+	size_t len = strnlen(s, TBVER_BUF_LEN);
+	int rc;
+
+	if (len >= TBVER_BUF_LEN)
+		return -1;
+
+	if (strcmp_s(s, TBVER_BUF_LEN, "1.9.6", &rc) == EOK && !rc)
+		*ver = TB_196;
+	else if (strcmp_s(s, TBVER_BUF_LEN, "1.9.9", &rc) == EOK && !rc)
+		*ver = TB_199;
+	else
+		return -1;
+
+	return 0;
 }
