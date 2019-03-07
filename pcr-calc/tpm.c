@@ -320,6 +320,19 @@ bool tpm_substitute_event(struct tpm *t, uint16_t alg,
 	return true;
 }
 
+bool tpm_substitute_all_events(struct tpm *t, uint16_t alg,
+				const struct pcr_event *evt,
+				unsigned int evt_count)
+{
+	unsigned int i;
+
+	for (i = 0; i < evt_count; ++i)
+		if (!tpm_substitute_event(t, alg, &evt[i]))
+			return false;
+
+	return true;
+}
+
 bool tpm_clear_all_event(struct tpm *t, uint16_t alg, uint32_t evt_type)
 {
 	int i, j;
