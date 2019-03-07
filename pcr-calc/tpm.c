@@ -193,37 +193,44 @@ bool tpm_record_event(struct tpm *t, uint16_t alg, void *e)
 
 	bank = &t->banks[bnum];
 
-	if (t->version == TPM12) {
-		tpm12_pcr_event_t *event = e;
+	switch (t->version) {
+		case TPM12: {
+			tpm12_pcr_event_t *event = e;
 
-		if (event->pcr_index == 255)
-			return true;
-
-		if (event->pcr_index > 23)
-			return false;
-
-		p = &bank->pcrs[event->pcr_index];
-
-		type = event->type;
-		evt_hash = (tb_hash_t *) event->digest;
-	} else {
-		uint32_t pcr_num;
-
-		pcr_num = *((uint32_t *) e);
-		if (pcr_num > 23) {
-			if (pcr_num == 255)
+			if (event->pcr_index == 255)
 				return true;
-			else
+
+			if (event->pcr_index >= MAX_PCR)
 				return false;
+
+			p = &bank->pcrs[event->pcr_index];
+
+			type = event->type;
+			evt_hash = (tb_hash_t *) event->digest;
+			break;
 		}
+		case TPM20: {
+			uint32_t pcr_num;
 
-		p = &bank->pcrs[pcr_num];
+			pcr_num = *((uint32_t *) e);
+			if (pcr_num >= MAX_PCR) {
+				if (pcr_num == 255)
+					return true;
+				else
+					return false;
+			}
 
-		e += sizeof(uint32_t);
-		type = *((uint32_t *) e);
+			p = &bank->pcrs[pcr_num];
 
-		e += sizeof(uint32_t);
-		evt_hash = (tb_hash_t *) e;
+			e += sizeof(uint32_t);
+			type = *((uint32_t *) e);
+
+			e += sizeof(uint32_t);
+			evt_hash = (tb_hash_t *) e;
+			break;
+		}
+		default:
+			return false;
 	}
 
 	if (!pcr_record_event(p, alg, type, evt_hash))
