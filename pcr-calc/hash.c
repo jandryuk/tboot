@@ -182,27 +182,29 @@ bool extend_hash(tb_hash_t *hash1, const tb_hash_t *hash2, uint16_t hash_alg)
 
 void print_hash(const tb_hash_t *hash, uint16_t hash_alg)
 {
+    unsigned int hash_size = get_hash_size(hash_alg);
+    unsigned int i;
+    const uint8_t *b = (const uint8_t *)hash;
+
     if ( hash == NULL )
         return;
 
-    if ( hash_alg == TB_HALG_SHA1 ) {
-        for ( unsigned int i = 0; i < SHA1_LENGTH; i++ ) {
-            printf("%02x", hash->sha1[i]);
-            if ( i < SHA1_LENGTH-1 )
-                printf(" ");
-        }
-        printf("\n");
+    switch (hash_alg) {
+        case TB_HALG_SHA1_LG:
+        case TB_HALG_SHA1:
+        case TB_HALG_SHA256:
+        case TB_HALG_SM3:
+        case TB_HALG_SHA384:
+        case TB_HALG_SHA512:
+            break;
+        default:
+            return;
     }
-    else if ( hash_alg == TB_HALG_SHA256 ) {
-        for ( unsigned int i = 0; i < SHA256_LENGTH; i++ ) {
-            printf("%02x", hash->sha256[i]);
-            if ( i < SHA256_LENGTH-1 )
-                printf(" ");
-        }
-        printf("\n");
-    }
-    else
-        return;
+
+    for (i = 0; i < hash_size - 1; ++i)
+        printf("%02x ", b[i]);
+
+    printf("%02x\n", b[i]);
 }
 
 void copy_hash(tb_hash_t *dest_hash, const tb_hash_t *src_hash,
