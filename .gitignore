@@ -78,6 +78,7 @@ lcptools/lcp_crtpollist
 # pcr-calc
 pcr-calc/module_hash
 pcr-calc/pcr-calc
+pcr-calc/acmmatch
 # tb_polgen
 tb_polgen/tb_polgen
 # utils

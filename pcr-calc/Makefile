@@ -11,7 +11,7 @@ ROOTDIR ?= $(CURDIR)/..
 
 include $(ROOTDIR)/Config.mk
 
-TARGETS := pcr-calc module_hash
+TARGETS := pcr-calc module_hash acmmatch
 
 CFLAGS += -D_LARGEFILE64_SOURCE
 
@@ -65,6 +65,9 @@ pcr-calc : acm.o eventlog.o pcr-calc.o tpm.o util.o hash.o tb_policy.o
 
 module_hash : module_hash.o hash.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) $(BZIP_LIB) -o $@
+
+acmmatch : acm.o acmmatch.o platform.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
 
 %.o : %.c $(BUILD_DEPS)
 	$(CC) $(CFLAGS) -DNO_TBOOT_LOGLVL -c $< -o $@
