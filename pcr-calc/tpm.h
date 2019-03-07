@@ -52,6 +52,7 @@
 struct pcr_event {
 	uint32_t type;
 	tb_hash_t digest;
+	int emulate;
 };
 
 #define MAX_PCR 24
@@ -176,6 +177,19 @@ struct pcr_event *tpm_find_event(struct tpm *t, uint16_t alg,
 				uint32_t evt_type, int n);
 bool tpm_substitute_event(struct tpm *t, uint16_t alg,
 			  const struct pcr_event *evt);
+bool tpm_substitute_all_events(struct tpm *t, uint16_t alg,
+			       const struct pcr_event *evt,
+			       unsigned int evt_count);
+typedef enum {
+	TB_196,
+	TB_199,
+} tb_version_t;
+bool tpm_emulate_event(struct tpm *t, uint16_t alg,
+		       const struct pcr_event *evt,
+		       const struct acm *acm, tb_version_t tbver);
+bool tpm_emulate_all_events(struct tpm *t, uint16_t alg,
+			    const struct pcr_event *evt, unsigned int evt_count,
+			    const struct acm *acm, tb_version_t tbver);
 bool tpm_clear_all_event(struct tpm *t, uint16_t alg, uint32_t evt_type);
 bool tpm_recalculate(struct tpm *t);
 void tpm_print(struct tpm *t, uint16_t alg);

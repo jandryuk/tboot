@@ -44,7 +44,9 @@
 
 #include "../include/hash.h"
 #include "uuid.h"
+#include "acm.h"
 #include "tpm.h"
+#include "eventlog.h"
 
 
 #define error_msg(fmt, ...)         fprintf(stderr, fmt, ##__VA_ARGS__)
@@ -319,6 +321,62 @@ bool tpm_substitute_event(struct tpm *t, uint16_t alg,
 
 	return true;
 }
+
+bool tpm_substitute_all_events(struct tpm *t, uint16_t alg,
+			       const struct pcr_event *evt,
+			       unsigned int evt_count)
+{
+	unsigned int i;
+
+	for (i = 0; i < evt_count; ++i)
+		if (!evt[i].emulate)
+			if (!tpm_substitute_event(t, alg, &evt[i]))
+				return false;
+
+	return true;
+}
+
+bool tpm_emulate_event(struct tpm *t, uint16_t alg,
+		       const struct pcr_event *evt,
+		       const struct acm *acm, tb_version_t tbver)
+{
+	unsigned int i, j;
+	struct pcr_bank *b;
+
+	if (!t || !evt)
+		return false;
+
+	b = tpm_get_bank(t, alg);
+	if (!b)
+		return false;
+
+	for (i = 0; i < MAX_PCR; ++i) {
+		struct pcr *p = &b->pcrs[i];
+
+		for (j = 0; j < p->log_idx; ++j)
+			if (p->log[j].type == evt->type)
+				if (emulate_event(acm, alg, t->version, tbver,
+						  &p->log[j]))
+					return false;
+	}
+
+	return true;
+}
+
+bool tpm_emulate_all_events(struct tpm *t, uint16_t alg,
+			    const struct pcr_event *evt, unsigned int evt_count,
+			    const struct acm *acm, tb_version_t tbver)
+{
+	unsigned int i;
+
+	for (i = 0; i < evt_count; ++i)
+		if (evt[i].emulate)
+			if (!tpm_emulate_event(t, alg, &evt[i], acm, tbver))
+				return false;
+
+	return true;
+}
+
 
 bool tpm_clear_all_event(struct tpm *t, uint16_t alg, uint32_t evt_type)
 {

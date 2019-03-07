@@ -60,7 +60,7 @@ distclean : clean
 BUILD_DEPS := $(ROOTDIR)/Config.mk $(CURDIR)/Makefile
 
 
-pcr-calc : eventlog.o pcr-calc.o tpm.o util.o hash.o tb_policy.o
+pcr-calc : acm.o eventlog.o pcr-calc.o tpm.o util.o hash.o tb_policy.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
 
 module_hash : module_hash.o hash.o

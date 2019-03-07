@@ -35,13 +35,186 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <openssl/evp.h>
 
 #include "uuid.h"
 #include "heap.h"
+#include "acm.h"
 #include "tpm.h"
-
+#include "eventlog.h"
 
 #define error_msg(fmt, ...)         fprintf(stderr, fmt, ##__VA_ARGS__)
+
+static int get_ossinit_caps_tboot_common(const txt_caps_t *acm_caps,
+		const txt_caps_t *mle_hdr, const txt_caps_t *mask,
+		uint8_t tpmver, txt_caps_t *caps)
+{
+	txt_caps_t ossinit_data_caps;
+
+	ossinit_data_caps._raw = mle_hdr->_raw & ~mask->_raw;
+
+	if (acm_caps->rlp_wake_monitor)
+		ossinit_data_caps.rlp_wake_monitor = 1;
+	else if (acm_caps->rlp_wake_getsec)
+		ossinit_data_caps.rlp_wake_getsec = 1;
+	else
+		return -1;
+
+	/* TODO: Can be forced on cmdline too. */
+	switch (tpmver) {
+		case TPM12:
+			ossinit_data_caps.tcg_event_log_format = 0;
+			break;
+		case TPM20:
+			/* TODO: Can be forced to legacy on cmdline. */
+			if (acm_caps->tcg_event_log_format)
+				ossinit_data_caps.tcg_event_log_format = 1;
+			break;
+		default:
+			return -1;
+	}
+
+	/* XXX: Forced to 0 for now (and masked anyway). May change? */
+	ossinit_data_caps.ecx_pgtbl = 0;
+
+	switch (tpmver) {
+		case TPM12:
+			ossinit_data_caps.pcr_map_no_legacy = 1;
+			ossinit_data_caps.pcr_map_da = 0;
+			/* TODO: Has to be enabled on cmdline (pcr_map). */
+			if (acm_caps->pcr_map_da && 0)
+				ossinit_data_caps.pcr_map_da = 1;
+			else if (!acm_caps->pcr_map_no_legacy)
+				ossinit_data_caps.pcr_map_no_legacy = 0;
+			else if (acm_caps->pcr_map_da)
+				ossinit_data_caps.pcr_map_da = 1;
+			else
+				return -1;
+			break;
+		case TPM20:
+			/* PCR mapping selection MUST be zero in TPM2.0 mode
+			 * since D/A mapping is the only supported by TPM2.0 */
+			ossinit_data_caps.pcr_map_no_legacy = 0;
+			ossinit_data_caps.pcr_map_da = 0;
+			break;
+		default:
+			return -1;
+	}
+
+	caps->_raw = ossinit_data_caps._raw;
+
+	return 0;
+}
+
+/* See tboot/txt/txt.c, include/mle.h */
+static int get_ossinit_caps_tboot196(const struct acm *acm, uint8_t tpmver,
+		txt_caps_t *caps)
+{
+	const txt_caps_t mle_hdr = {
+		.rlp_wake_getsec = 1,
+		.rlp_wake_monitor = 1,
+		.ecx_pgtbl = 1,
+		.stm = 0,
+		.pcr_map_no_legacy = 0,
+		.pcr_map_da = 1,
+		.platform_type = 0,
+		.max_phy_addr = 0,
+		.tcg_event_log_format = 1,
+		.reserved1 = 0,
+	};  /* MLE_HDR_CAPS: 0x227 */
+	const txt_caps_t mask = {
+		.rlp_wake_getsec = 1,
+		.rlp_wake_monitor = 1,
+		.ecx_pgtbl = 0,
+		.stm = 0,
+		.pcr_map_no_legacy = 0,
+		.pcr_map_da = 1,
+		.platform_type = 0,
+		.max_phy_addr = 0,
+		.tcg_event_log_format = 0,
+		.reserved1 = 0,
+	};
+
+	return get_ossinit_caps_tboot_common(&acm->infotable->capabilities,
+			&mle_hdr, &mask, tpmver, caps);
+}
+
+/* See tboot/txt/txt.c, include/mle.h */
+/* Since 1.9.6: tcg_event_log_format is now masked before processing, so the
+ * value from the MLE header defined in TBoot is ignored. */
+static int get_ossinit_caps_tboot199(const struct acm *acm, uint8_t tpmver,
+		txt_caps_t *caps)
+{
+	const txt_caps_t mle_hdr = {
+		.rlp_wake_getsec = 1,
+		.rlp_wake_monitor = 1,
+		.ecx_pgtbl = 1,
+		.stm = 0,
+		.pcr_map_no_legacy = 0,
+		.pcr_map_da = 1,
+		.platform_type = 0,
+		.max_phy_addr = 0,
+		.tcg_event_log_format = 1,
+		.reserved1 = 0,
+	};  /* MLE_HDR_CAPS: 0x227 */
+	const txt_caps_t mask = {
+		.rlp_wake_getsec = 1,
+		.rlp_wake_monitor = 1,
+		.ecx_pgtbl = 0,
+		.stm = 0,
+		.pcr_map_no_legacy = 0,
+		.pcr_map_da = 1,
+		.platform_type = 0,
+		.max_phy_addr = 0,
+		.tcg_event_log_format = 1,
+		.reserved1 = 0,
+	};
+
+	return get_ossinit_caps_tboot_common(&acm->infotable->capabilities,
+			&mle_hdr, &mask, tpmver, caps);
+}
+
+static int event_ossinit_data_cap_hash(const struct acm *acm, uint16_t alg,
+		uint8_t tpmver, tb_version_t tbver, tb_hash_t *hash)
+{
+	txt_caps_t caps;
+	int rc;
+
+	switch (tbver) {
+		case TB_196:
+			rc = get_ossinit_caps_tboot196(acm, tpmver, &caps);
+			break;
+		case TB_199:
+			rc = get_ossinit_caps_tboot199(acm, tpmver, &caps);
+			break;
+		default:
+			rc = -1;
+			break;
+	}
+
+	if (!hash_buffer((unsigned char *)&caps, sizeof (caps), hash, alg))
+		return -1;
+
+	return rc;
+}
+
+int emulate_event(const struct acm *acm, uint16_t alg,
+		uint8_t tpmver, tb_version_t tbver, struct pcr_event *evt)
+{
+	int rc;
+
+	switch (evt->type) {
+		case EVTYPE_OSSINITDATA_CAP_HASH:
+			rc = event_ossinit_data_cap_hash(acm, alg, tpmver, tbver,
+					&evt->digest);
+			break;
+		default:
+			rc = -1;
+			break;
+	}
+
+	return rc;
+}
 
 struct tpm *parse_tpm12_log(char *buffer, size_t size)
 {

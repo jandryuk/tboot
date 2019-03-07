@@ -38,9 +38,12 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
-
 bool read_hash(const char *hexstr, tb_hash_t *hash);
 size_t read_file(const char *path, char **buffer);
 int read_pcr_event(const char *s, struct pcr_event *evt);
+
+int read_tboot_version(const char *s, tb_version_t *ver);
+int read_pcr_event_emulate(const char *s,
+	 struct acm **acm, tb_version_t *ver, struct pcr_event *evt);
 
 #endif
