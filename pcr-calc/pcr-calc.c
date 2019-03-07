@@ -205,7 +205,7 @@ out:
 int main(int argc, char *argv[]) {
 	extern int optind;
 	int opt, flags, mb_count = 0, evt_count = 0, ret = 0;
-	tb_hash_t mb[20];
+	tb_hash_t mb[20] = { 0 };
 	struct pcr_event evt[20];
 	struct tpm *t = NULL;
 	uint16_t alg_override = 0;

@@ -81,7 +81,6 @@ struct pcr_bank {
 struct tpm {
 	uint8_t version;
 	uint16_t alg;
-	uint8_t num_banks;
 	uint8_t active_banks;
 	struct pcr_bank *banks;
 };
