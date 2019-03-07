@@ -153,13 +153,13 @@ struct tpm *new_tpm(uint8_t version)
 			    return NULL;
 	}
 
-	t = malloc(sizeof(*t));
+	t = calloc(1, sizeof(*t));
 	if (!t) {
 		return NULL;
 	}
 
 	t->version = version;
-	t->banks = malloc(banks * sizeof(struct pcr_bank));
+	t->banks = calloc(banks, sizeof(struct pcr_bank));
 	if (!t->banks) {
 		free(t);
 		return NULL;
@@ -364,6 +364,7 @@ bool tpm_recalculate(struct tpm *t)
 void tpm_print(struct tpm *t, uint16_t alg)
 {
 	int i,bnum = alg_to_bank(alg);
+	unsigned int hash_size = get_hash_size(alg);
 	struct pcr_bank *bank;
 	tb_hash_t null_hash;
 
@@ -378,8 +379,8 @@ void tpm_print(struct tpm *t, uint16_t alg)
 		int diff;
 		errno_t err;
 
-		err = memcmp_s(&(bank->pcrs[i].value), sizeof(tb_hash_t),
-				&null_hash, sizeof(tb_hash_t), &diff);
+		err = memcmp_s(&(bank->pcrs[i].value), hash_size,
+				&null_hash, hash_size, &diff);
 		if (err) {
 			error_msg("Invalid value in PCR%d.", i);
 			break;
@@ -395,6 +396,7 @@ void tpm_print(struct tpm *t, uint16_t alg)
 void tpm_dump(struct tpm *t, uint16_t alg)
 {
 	int i,bnum = alg_to_bank(alg);
+	unsigned int hash_size = get_hash_size(alg);
 	struct pcr_bank *bank;
 	tb_hash_t null_hash;
 
@@ -409,8 +411,8 @@ void tpm_dump(struct tpm *t, uint16_t alg)
 		int diff;
 		errno_t err;
 
-		err = memcmp_s(&(bank->pcrs[i].value), sizeof(tb_hash_t),
-				&null_hash, sizeof(tb_hash_t), &diff);
+		err = memcmp_s(&(bank->pcrs[i].value), hash_size,
+				&null_hash, hash_size, &diff);
 		if (err) {
 			error_msg("Invalid value in PCR%d.", i);
 			break;
