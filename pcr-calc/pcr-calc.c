@@ -78,12 +78,12 @@ static void print_help(void) {
 		"\t-a alg Alogrithm: select what hash alogrithm to use.\n"
 		"\t-p policy_file Tboot Policy: the policy that was/will be used.\n"
 		"\t-m hash_str Multiboot Module: include module hash (MLE first).\n"
-		"\t-e evt_type:hash_str Override PCR events type found in the logs with the provided value.\n");
+		"\t-e evt_type:hash_str Override PCR events type found in the logs with the provided value.\n"
+		"\t-F file Use the given file as tpm event log (replace /sys/kernel/security/txt/*_binary_evtlog).\n");
 }
 
 static bool apply_lg_policy(struct tpm *t, tb_policy_t *policy, size_t pol_size,
-			    tb_hash_t *mb, int mb_count,
-			    const struct pcr_event *evt, int evt_count) {
+			    tb_hash_t *mb, int mb_count) {
 	tb_hash_t *pol_hash;
 	struct pcr *p;
 	struct pcr_event *pe;
@@ -94,10 +94,6 @@ static bool apply_lg_policy(struct tpm *t, tb_policy_t *policy, size_t pol_size,
 
 	pe = tpm_find_event(t, policy->hash_alg, TPM_EVT_MLE_HASH, 1);
 	pe->digest = mb[0];
-
-	for (i = 0; i < evt_count; ++i)
-		if (!tpm_substitute_event(t, policy->hash_alg, &evt[i]))
-			goto out;
 
 	if (!tpm_recalculate(t))
 		goto out;
@@ -139,8 +135,7 @@ out:
 }
 
 static bool apply_da_policy(struct tpm *t, tb_policy_t *policy, size_t pol_size,
-			    tb_hash_t *mb, int mb_count,
-			    const struct pcr_event *evt, int evt_count) {
+			    tb_hash_t *mb, int mb_count) {
 	tb_hash_t *pol_hash;
 	struct pcr *p;
 	struct pcr_event *pe;
@@ -154,10 +149,6 @@ static bool apply_da_policy(struct tpm *t, tb_policy_t *policy, size_t pol_size,
 
 	pe = tpm_find_event(t, hash_alg, TPM_EVT_MLE_HASH, 1);
 	pe->digest = mb[0];
-
-	for (i = 0; i < evt_count; ++i)
-		if (!tpm_substitute_event(t, hash_alg, &evt[i]))
-			goto out;
 
 	if (!tpm_recalculate(t))
 		goto out;
@@ -211,10 +202,11 @@ int main(int argc, char *argv[]) {
 	uint16_t alg_override = 0;
 	size_t pol_size = 0;
 	tb_policy_t *policy_file = NULL;
+	char *eventlog = NULL;
 
 	flags = FLAG_TPM12;
 
-	while ((opt = getopt(argc, (char ** const)argv, "h2dclvqa:p:m:e:")) != -1) {
+	while ((opt = getopt(argc, (char ** const)argv, "h2dclvqa:p:m:e:F:")) != -1) {
 		switch (opt) {
 			case 'm':
 				if (mb_count >= 20) {
@@ -283,6 +275,9 @@ int main(int argc, char *argv[]) {
 				}
 				++evt_count;
 			break;
+			case 'F':
+				eventlog = optarg;
+			break;
 			case 'h':
 				print_help();
 				ret = 1;
@@ -305,8 +300,9 @@ int main(int argc, char *argv[]) {
 
 	if (flags & FLAG_TPM12) {
 		char *buffer;
-		size_t size = read_file(TPM12_LOG, &buffer);
+		size_t size;
 
+		size = read_file(eventlog ? eventlog : TPM12_LOG, &buffer);
 		if (size > 0) {
 			t = parse_tpm12_log(buffer, size);
 			free(buffer);
@@ -321,8 +317,9 @@ int main(int argc, char *argv[]) {
 		t->alg = TB_HALG_SHA1;
 	} else {
 		char *buffer;
-		size_t size = read_file(TPM20_LOG, &buffer);
+		size_t size;
 
+		size = read_file(eventlog ? eventlog : TPM20_LOG, &buffer);
 		if (size > 0) {
 			t = parse_tpm20_log(buffer, size);
 			free(buffer);
@@ -333,10 +330,10 @@ int main(int argc, char *argv[]) {
 			ret = 1;
 			goto out;
 		}
-
-// broken as you need to override if there is no policy file, fix!!!
 		t->alg = alg_override != 0 ? alg_override : policy_file->hash_alg;
 	}
+	/* t->alg is set from here, since alg_override == 0 && policy_file ==
+	 * NULL cannot pass the previous sanity check. */
 
 	if (flags & FLAG_CURRENT) {
 		tpm_print(t, t->alg);
@@ -348,14 +345,21 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
+	/* Change/Emulate events in the log according the cmdline. */
+	if (!tpm_substitute_all_events(t, t->alg, evt, evt_count)) {
+		error_msg("failed to apply event substitutions to the event log.\n");
+		ret = 1;
+		goto out;
+	}
+
 	if (flags & FLAG_DA) {
-		if (!apply_da_policy(t, policy_file, pol_size, mb, mb_count, evt, evt_count)) {
+		if (!apply_da_policy(t, policy_file, pol_size, mb, mb_count)) {
 			error_msg("failed applying DA policy.\n");
 			ret = 1;
 			goto out_destroy;
 		}
 	} else {
-		if (!apply_lg_policy(t, policy_file, pol_size, mb, mb_count, evt, evt_count)) {
+		if (!apply_lg_policy(t, policy_file, pol_size, mb, mb_count)) {
 			error_msg("failed applying LG policy.\n");
 			ret = 1;
 			goto out_destroy;
