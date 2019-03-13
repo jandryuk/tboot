@@ -340,25 +340,25 @@ int main(int argc, char *argv[]) {
 
 	if (flags & FLAG_CURRENT) {
 		tpm_print(t, t->alg);
-		return 0;
+		goto out;
 	}
 
 	if (flags & FLAG_LOG) {
 		tpm_dump(t, t->alg);
-		return 0;
+		goto out;
 	}
 
 	if (flags & FLAG_DA) {
 		if (!apply_da_policy(t, policy_file, pol_size, mb, mb_count, evt, evt_count)) {
 			error_msg("failed applying DA policy.\n");
 			ret = 1;
-			goto out_destroy;
+			goto out;
 		}
 	} else {
 		if (!apply_lg_policy(t, policy_file, pol_size, mb, mb_count, evt, evt_count)) {
 			error_msg("failed applying LG policy.\n");
 			ret = 1;
-			goto out_destroy;
+			goto out;
 		}
 	}
 
@@ -367,10 +367,9 @@ int main(int argc, char *argv[]) {
 	else
 		tpm_print(t, t->alg);
 
-	return 0;
-
-out_destroy:
-	destroy_tpm(t);
 out:
+	if (t != NULL)
+		destroy_tpm(t);
+
 	return ret;
 }
