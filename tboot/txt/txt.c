@@ -676,11 +676,11 @@ bool evtlog_append(uint8_t pcr, hash_list_t *hl, uint32_t type)
     return true;
 }
 
-void export_evtlog(uint64_t *log, uint64_t *size)
+void export_evtlog(uint64_t *log, uint64_t *size, uint8_t *format)
 {
-    int log_type = get_evtlog_type();
+    *format = get_evtlog_type();
 
-    switch (log_type) {
+    switch (*format) {
         case EVTLOG_TPM12:
             export_evtlog_tpm12(log, size);
             break;
@@ -693,6 +693,7 @@ void export_evtlog(uint64_t *log, uint64_t *size)
         default:
             *log = 0;
             *size = 0;
+            *format = 0;
             break;
     }
 }

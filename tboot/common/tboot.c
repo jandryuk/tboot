@@ -271,7 +271,8 @@ static void post_launch(void)
     /*
      * export tpm event log
      */
-    export_evtlog(&_tboot_shared.evt_log_region, &_tboot_shared.evt_log_size);
+    export_evtlog(&_tboot_shared.evt_log_region, &_tboot_shared.evt_log_size,
+                  &_tboot_shared.evt_log_format);
 
     /* replace map in loader context with copy */
     replace_e820_map(g_ldr_ctx);
