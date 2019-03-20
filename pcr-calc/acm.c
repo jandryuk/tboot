@@ -11,11 +11,14 @@
 #include "uuid.h"
 #include "acm.h"
 
-#define DEBUG 0
-#define printd(fmt, ...)					\
+#ifdef DEBUG
+# define printd(fmt, ...)					\
 	if (DEBUG) {						\
 		fprintf(stdout, fmt "\n", ##__VA_ARGS__);	\
 	}
+#else
+# define printd(fmt, ...)
+#endif
 
 static acm_hdr_t *get_acm_header(void *p)
 {
