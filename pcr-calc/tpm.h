@@ -43,6 +43,8 @@
 #include "../include/config.h"
 #include "../include/hash.h"
 #include "heap.h"
+#include "tboot.h"
+#include "eventlog_tcg.h"
 
 
 #define TPM_EVT_HASH_START	0x402
@@ -172,6 +174,9 @@ static inline bool extend_hash_start(void)
 struct tpm *new_tpm(uint8_t version);
 void destroy_tpm(struct tpm *t);
 bool tpm_record_event(struct tpm *t, uint16_t alg, void *e);
+size_t tpm_record_event_tcg(struct tpm *t, uint32_t pcr, uint32_t type,
+	const TPML_DIGEST_VALUES *v,
+	const TCG_EfiSpecIdEventAlgorithmSizes *algs);
 int tpm_count_event(struct tpm *t, uint16_t alg, uint32_t evt_type);
 struct pcr_event *tpm_find_event(struct tpm *t, uint16_t alg,
 				uint32_t evt_type, int n);
@@ -180,10 +185,6 @@ bool tpm_substitute_event(struct tpm *t, uint16_t alg,
 bool tpm_substitute_all_events(struct tpm *t, uint16_t alg,
 				const struct pcr_event *evt,
 				unsigned int evt_count);
-typedef enum {
-	TB_196,
-	TB_199,
-} tb_version_t;
 bool tpm_emulate_event(struct tpm *t, uint16_t alg,
 		       const struct pcr_event *evt,
 		       const struct acm *acm, tb_version_t tbver);

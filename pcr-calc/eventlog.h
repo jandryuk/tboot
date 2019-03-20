@@ -36,6 +36,8 @@
 #ifndef __EVENTLOG_H__
 #define __EVENTLOG_H__
 
+#include "tboot.h"
+
 typedef enum {
 	EVTYPE_BASE                 = 0x400,
 	EVTYPE_PCRMAPPING           = EVTYPE_BASE + 1,
@@ -55,6 +57,7 @@ int emulate_event(const struct acm *acm, uint16_t alg, uint8_t tpmver,
 	tb_version_t tbver, struct pcr_event *evt);
 
 struct tpm *parse_tpm12_log(char *buffer, size_t size);
-struct tpm *parse_tpm20_log(char *buffer, size_t size);
+struct tpm *parse_tpm20_log_legacy(char *buffer, size_t size);
+struct tpm *parse_tpm20_log_tcg(void *buffer, size_t size);
 
 #endif

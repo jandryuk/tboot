@@ -242,6 +242,51 @@ bool tpm_record_event(struct tpm *t, uint16_t alg, void *e)
 	return true;
 }
 
+/*
+ * Agile log structure helper.
+ */
+static size_t algorithms_get_digest_size(uint16_t id,
+	const TCG_EfiSpecIdEventAlgorithmSizes *algs)
+{
+	unsigned int i;
+
+	for (i = 0; i < algs->numberOfAlgorithms; ++i)
+		if (algs->digestSizes[i].algorithmId == id)
+			return algs->digestSizes[i].digestSize;
+
+	return 0;
+}
+
+size_t tpm_record_event_tcg(struct tpm *t, uint32_t pcr, uint32_t type,
+	const TPML_DIGEST_VALUES *v,
+	const TCG_EfiSpecIdEventAlgorithmSizes *algs)
+{
+	size_t i, n = sizeof (v->Count);
+
+	for (i = 0; i < v->Count; ++i) {
+		const TPMT_HA *ha = ((void*)v) + n;
+		int bnum = alg_to_bank(ha->AlgorithmId);
+		struct pcr_bank *bank = &t->banks[bnum];
+		size_t size;
+
+		size = algorithms_get_digest_size(ha->AlgorithmId, algs);
+		if (size == 0)
+			return 0;
+
+		if (pcr < MAX_PCR) {
+			if (!pcr_record_event(&bank->pcrs[pcr],
+				ha->AlgorithmId, type, (tb_hash_t*)ha->Digest))
+				return 0;
+
+			t->active_banks |= alg_to_mask(ha->AlgorithmId);
+		}
+
+		n += sizeof (ha->AlgorithmId) + size;
+	}
+
+	return n;
+}
+
 int tpm_count_event(struct tpm *t, uint16_t alg, uint32_t evt_type)
 {
 	int i, j, count = 0;

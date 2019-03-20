@@ -59,9 +59,11 @@
 #define FLAG_CURRENT	1<<3
 #define FLAG_LOG	1<<4
 #define FLAG_VERBOSE	1<<5
+#define FLAG_EVTLOG_OLD 1<<6
 
 #define TPM12_LOG "/sys/kernel/security/txt/tpm12_binary_evtlog"
-#define TPM20_LOG "/sys/kernel/security/txt/tpm20_binary_evtlog"
+#define TPM20_LOG_OLD "/sys/kernel/security/txt/tpm20_binary_evtlog"
+#define TPM20_LOG "/sys/kernel/security/txt/tpm20_binary_evtlog_tcg"
 
 #define error_msg(fmt, ...)         fprintf(stderr, fmt, ##__VA_ARGS__)
 
@@ -82,7 +84,8 @@ static void print_help(void) {
 		"\t-e evt_type:<hash_str>|emulate Override PCR events type found in the logs with the provided value or emulate the value entirely (emulation requires TBoot version and ACM to be provided).\n"
 		"\t-F file Use the given file as tpm event log (replace /sys/kernel/security/txt/*_binary_evtlog).\n"
 		"\t-A acm-path Path to the ACM that will be used to emulate events for PCR calculations (see -e).\n"
-		"\t-V tboot-version TBoot version targeted to emulate events for PCR calculations (see -e)\n.");
+		"\t-V tboot-version TBoot version targeted to emulate events for PCR calculations (see -e).\n"
+		"\t-o Assume the event-log to be formated using the legacy format (prior TCG PC Client Platform. EFI Protocol Specification).\n");
 }
 
 static bool apply_lg_policy(struct tpm *t, tb_policy_t *policy, size_t pol_size,
@@ -207,11 +210,11 @@ int main(int argc, char *argv[]) {
 	tb_policy_t *policy_file = NULL;
 	struct acm *acm = NULL;
 	tb_version_t tbver = TB_199;
-	char *eventlog = NULL;
+	const char *eventlog = NULL;
 
 	flags = FLAG_TPM12;
 
-	while ((opt = getopt(argc, (char ** const)argv, "h2dclvqa:p:m:e:F:A:V:")) != -1) {
+	while ((opt = getopt(argc, (char ** const)argv, "h2dclvqa:p:m:e:F:A:V:o")) != -1) {
 		switch (opt) {
 			case 'm':
 				if (mb_count >= 20) {
@@ -303,6 +306,9 @@ int main(int argc, char *argv[]) {
 					goto out;
 				}
 			break;
+			case 'o':
+				flags |= FLAG_EVTLOG_OLD;
+			break;
 			case 'h':
 				print_help();
 				ret = 1;
@@ -344,9 +350,23 @@ int main(int argc, char *argv[]) {
 		char *buffer;
 		size_t size;
 
-		size = read_file(eventlog ? eventlog : TPM20_LOG, &buffer);
+		if (eventlog == NULL) {
+			if (!access(TPM20_LOG, R_OK))
+				eventlog = TPM20_LOG;
+			else if (!access(TPM20_LOG_OLD, R_OK))
+				eventlog = TPM20_LOG_OLD;
+			else {
+				error_msg("failed to find TPM 2.0 event log.\n");
+				goto out;
+			}
+		}
+
+		size = read_file(eventlog, &buffer);
 		if (size > 0) {
-			t = parse_tpm20_log(buffer, size);
+			if (flags & FLAG_EVTLOG_OLD)
+				t = parse_tpm20_log_legacy(buffer, size);
+			else
+				t = parse_tpm20_log_tcg(buffer, size);
 			free(buffer);
 		}
 

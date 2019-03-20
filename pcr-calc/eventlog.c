@@ -249,7 +249,7 @@ out:
 	return NULL;
 }
 
-struct tpm *parse_tpm20_log(char *buffer, size_t size)
+struct tpm *parse_tpm20_log_legacy(char *buffer, size_t size)
 {
 	struct tpm *t;
 	void *c, *n;
@@ -288,5 +288,74 @@ struct tpm *parse_tpm20_log(char *buffer, size_t size)
 out_free:
 	destroy_tpm(t);
 out:
+	return NULL;
+}
+
+/*
+ * Agile log structure helpers.
+ */
+static inline const TCG_EfiSpecIdEventAlgorithmSizes *
+	tcg_header_algorithms(const TCG_EfiSpecIdEventStructHeader *hdr)
+{
+	/* TCG_EfiSpecIdEventAlgorithmSizes follows the static header
+	 * immediately. */
+	return ((void*)hdr) + sizeof (*hdr);
+}
+
+static inline size_t tcg_pcr_event_size(const TCG_PCR_EVENT *h)
+{
+	return sizeof (*h) + h->EventSize;
+}
+
+static size_t parse_tcg_pcr_event2(struct tpm *t, const TCG_PCR_EVENT2_HDR *h,
+	const TCG_EfiSpecIdEventAlgorithmSizes *algs)
+{
+	const TPML_DIGEST_VALUES *digests;
+	const TCG_PCR_EVENT2_EVT *event;
+	unsigned int n, c = sizeof (*h);
+
+	digests = ((void*)h) + c;
+	n = tpm_record_event_tcg(t, h->PCRIndex, h->EventType, digests, algs);
+	if (!n)
+		return 0;
+
+	c += n;
+	event = ((void*)h) + c;
+	/* Skip the Event content for now. */
+        n = sizeof (event->EventSize) +
+		sizeof (event->Event[0]) * event->EventSize;
+	c += n;
+
+	return c;
+}
+
+struct tpm *parse_tpm20_log_tcg(void *buffer, size_t size)
+{
+	struct tpm *t;
+	const TCG_PCR_EVENT *hdr = buffer;
+	const TCG_EfiSpecIdEventAlgorithmSizes *algs;
+	unsigned int n, c;
+
+	t = new_tpm(TPM20);
+	if (!t)
+		return NULL;
+
+	if (hdr->PCRIndex != PCR_INDEX_HEADER ||
+	    hdr->EventType != EV_NO_ACTION)
+		goto out;
+
+	algs = tcg_header_algorithms((void*)hdr->Event);
+	c = tcg_pcr_event_size(hdr);
+
+	for (; c < size; c += n) {
+		n = parse_tcg_pcr_event2(t, buffer + c, algs);
+		if (!n)
+			goto out;
+	}
+
+	return t;
+out:
+	destroy_tpm(t);
+
 	return NULL;
 }
