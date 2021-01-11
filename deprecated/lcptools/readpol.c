@@ -42,8 +42,8 @@
 #include <trousers/trousers.h>
 #include <safe_lib.h>
 #define PRINT   printf
-#include "../include/uuid.h"
-#include "../include/lcp.h"
+#include "../../include/uuid.h"
+#include "../../include/lcp.h"
 #include "lcptools.h"
 #include "lcputils.h"
 

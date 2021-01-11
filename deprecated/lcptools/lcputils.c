@@ -46,8 +46,8 @@
 #include <safe_lib.h>
 #include <snprintf_s.h>
 #define PRINT   printf
-#include "../include/uuid.h"
-#include "../include/lcp.h"
+#include "../../include/uuid.h"
+#include "../../include/lcp.h"
 #include "lcptools.h"
 #include "lcputils.h"
 

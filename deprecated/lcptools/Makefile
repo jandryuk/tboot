@@ -7,7 +7,7 @@
 # lcptools makefile
 #
 
-ROOTDIR ?= $(CURDIR)/..
+ROOTDIR ?= $(CURDIR)/../..
 
 include $(ROOTDIR)/Config.mk
 
