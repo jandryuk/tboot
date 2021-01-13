@@ -545,7 +545,7 @@ bool rsa_sign_list1_data(lcp_policy_list_t *pollist, const char *privkey_file)
 
 bool sign_lcp_policy_list_t(sign_user_input user_input)
 {
-    bool no_sigblock_ok;
+    bool no_sigblock_ok = false;
     bool result;
     lcp_policy_list_t *pollist = NULL;
     lcp_signature_t2 *sig = NULL;

@@ -158,6 +158,9 @@ static bool read_pcrinfo_file(const char *file)
         Getline also reads up to and including newline. We need to remove it else
         import_hash will fail.
         */
+        if (ptr2token == NULL) {
+            goto ERROR;
+        }
         ptr2token[40] = '\0';
         if (!import_hash(ptr2token, (tb_hash_t *) &this_pcr.digest, LCP_POLHALG_SHA1)) {
             ERROR("Error: failed to import hash. Check digest format.\n");

@@ -118,8 +118,10 @@ lcp_policy_list_t2_1 *get_policy_list_2_1_data(const void *raw_data, size_t base
         status = memcpy_s(new_pollist, base_size, raw_data, base_size);
         if (status == EOK)
             return new_pollist;
-        else
+        else {
+            free(new_pollist);
             return NULL;
+        }
     }
 
     new_pollist = malloc(key_signature_offset);
@@ -226,7 +228,7 @@ lcp_policy_list_t2_1 *read_policy_list_2_1_file(bool sign_it, const char *list_f
     }
     //List has signature and we want to sign it, disregard the signature it has
     //and return it without it.
-    else if ( (has_sig && sign_it) || !has_sig) {
+    else {
         //Pass 0 as last arg to get_data func, this way we don't get sig.
         new_pollist = get_policy_list_2_1_data((const void *) pollist, base_size+
                                                                   elts_size, 0);
@@ -237,11 +239,6 @@ lcp_policy_list_t2_1 *read_policy_list_2_1_file(bool sign_it, const char *list_f
         }
         free(pollist);
         return new_pollist;
-    }
-    else {
-        //Error;
-        free(pollist);
-        return NULL;
     }
 }
 
@@ -448,9 +445,6 @@ Out: Nothing
         return;
     }
 
-    if ( prefix == NULL ) {
-        prefix = "";
-    }
     DISPLAY("LCP_POLICY_LIST_2_1 structure:\n");
     DISPLAY("%s Version: 0x%x\n", prefix, pollist->Version);
     DISPLAY("%s KeySignatureOffset: 0x%x\n", prefix, pollist->KeySignatureOffset);
@@ -653,7 +647,7 @@ bool verify_tpm20_pollist_2_1_sig(lcp_policy_list_t2_1 *pollist)
     bool result;
     sig_key_2_1_header *header;
     size_t base_size = offsetof(lcp_policy_list_t2_1, PolicyElements);
-    size_t elts_size = pollist->PolicyElementsSize;
+    size_t elts_size;
     lcp_signature_2_1 *sig;
 
     LOG("[verify_tpm20_pollist_2_1_sig]\n");
@@ -661,6 +655,8 @@ bool verify_tpm20_pollist_2_1_sig(lcp_policy_list_t2_1 *pollist)
         ERROR("Error: failed to get policy list structure.\n");
         return false;
     }
+
+    elts_size = pollist->PolicyElementsSize;
 
     sig = get_tpm20_signature_2_1(pollist);
     if (sig == NULL) {

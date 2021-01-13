@@ -845,7 +845,7 @@ bool verify_ec_signature(sized_buffer *data, sized_buffer *pubkey_x,
             OPENSSL_free((void *) ec_group);
         }
         if (der_encoded_sig != NULL) {
-            free((void *)der_encoded_sig);
+            OPENSSL_free((void *)der_encoded_sig);
         }
         if (mctx != NULL) {
             OPENSSL_free(mctx);

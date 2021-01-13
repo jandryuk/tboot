@@ -288,10 +288,6 @@ lcp_policy_data_t2 *create_poldata(void)
             pollist21 = NULL;
         }
         if ( poldata == NULL ) {
-            if (pollist != NULL)
-                free(pollist);
-            if (pollist21 != NULL)
-                free(pollist21);
             return NULL;
         }
     }
@@ -366,6 +362,7 @@ int create(void)
                 if (i == 0) {
                     use_only_version = version; //Read version of first list
                 }
+                free(file_data);
                 if ( use_only_version != version ) { //If version differs, that's error
                     ERROR("ERROR: Mixing list versions is not supported.\n");
                     free(pol);
@@ -425,8 +422,6 @@ int create(void)
                 }
                 if ( poldata == NULL ) {
                     free(pol);
-                    if (pollist != NULL)
-                        free(pollist);
                     return 1;
                 }
             }

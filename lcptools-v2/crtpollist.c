@@ -193,8 +193,10 @@ static int create_list_2_1(void)
             return 1;
         }
         pollist = add_tpm20_policy_element_2_1(pollist, elt);
-        if ( pollist == NULL )
+        if ( pollist == NULL ) {
+            free(elt);
             return 1;
+        }
         free(elt);
         elt = NULL;
     }
@@ -444,6 +446,7 @@ static int show(void)
 
     uint16_t  version;
     memcpy_s((void*)&version, sizeof(uint16_t), (const void *)pollist, sizeof(uint16_t));
+    free(pollist);
     if (MAJOR_VER(version) == MAJOR_VER(LCP_TPM12_POLICY_LIST_VERSION) ) {
         pollist = read_policy_list_file(files[0], false, &no_sigblock_ok);
         if (pollist == NULL) {

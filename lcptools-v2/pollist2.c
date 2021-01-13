@@ -1350,7 +1350,7 @@ bool sign_lcp_policy_list_t2(sign_user_input user_input)
 
     Out: true on success false on failure.
     */
-    bool no_sigblock_ok;
+    bool no_sigblock_ok = false;
     bool write_ok;
     lcp_policy_list_t2 *pollist = NULL;
 
