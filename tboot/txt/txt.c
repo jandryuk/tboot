@@ -715,7 +715,7 @@ static txt_heap_t *init_txt_heap(void *ptab_base, acm_hdr_t *sinit, loader_ctx *
         os_sinit_data->capabilities.pcr_map_no_legacy = 0;
         os_sinit_data->capabilities.pcr_map_da = 0;
         g_using_da = 1;
-    }   
+    }
 
     /* Event log initialization */
     if ( os_sinit_data->version >= 6 )

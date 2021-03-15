@@ -290,6 +290,7 @@ void print_txt_caps(const char *prefix, txt_caps_t caps)
     printk(TBOOT_DETA"%s    platform_type: %d\n", prefix, caps.platform_type);
     printk(TBOOT_DETA"%s    max_phy_addr: %d\n", prefix, caps.max_phy_addr);
     printk(TBOOT_DETA"%s    tcg_event_log_format: %d\n", prefix, caps.tcg_event_log_format);
+    printk(TBOOT_DETA"%s    cbnt_supported: %d\n", prefix, caps.cbnt_supported);
 }
 
 static void print_acm_hdr(const acm_hdr_t *hdr, const char *mod_name)
