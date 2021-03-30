@@ -6,8 +6,8 @@
 #
 # tboot-specific build settings
 #
-RELEASEVER  := "1.10.0"
-RELEASETIME := "2020-11-13 16:00 +0100"
+RELEASEVER  := "1.10.1"
+RELEASETIME := "2021-03-30 11:00 +0100"
 ROOTDIR ?= $(CURDIR)/..
 
 # tboot needs too many customized compiler settings to use system CFLAGS,

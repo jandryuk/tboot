@@ -1,3 +1,6 @@
+20210330: v1.10.1
+        Indicate to SINIT that CBnT is supported by TBOOT
+        lcptools: Fix issues from static code analysis
 20201113: v1.10.0
         Rename TXT related tools to have 'txt-' prefix
         Clarify license issues
