@@ -59,7 +59,7 @@ build-% :
 dist : $(patsubst %,dist-%,$(SUBDIRS))
 	[ -d $(DISTDIR) ] || $(INSTALL_DIR) $(DISTDIR)
 	$(INSTALL_DATA) COPYING $(DISTDIR)
-	$(INSTALL_DATA) README $(DISTDIR)
+	$(INSTALL_DATA) README.md $(DISTDIR)
 
 dist-% :
 	$(MAKE) -C $* dist
