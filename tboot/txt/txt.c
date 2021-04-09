@@ -692,7 +692,7 @@ static txt_heap_t *init_txt_heap(void *ptab_base, acm_hdr_t *sinit, loader_ctx *
         
     /* capabilities : choose DA/LG */
     os_sinit_data->capabilities.pcr_map_no_legacy = 1;
-    if ( sinit_caps.pcr_map_da && get_tboot_prefer_da() )
+    if ( sinit_caps.pcr_map_da && (get_tboot_prefer_da() || sinit_caps.cbnt_supported) )
         os_sinit_data->capabilities.pcr_map_da = 1;
     else if ( !sinit_caps.pcr_map_no_legacy )
         os_sinit_data->capabilities.pcr_map_no_legacy = 0;
