@@ -60,7 +60,7 @@
 #include <efi_memmap.h>
 
 /* copy of kernel/VMM command line so that can append 'tboot=0x1234' */
-static char *new_cmdline = (char *)TBOOT_KERNEL_CMDLINE_ADDR;
+static char * volatile new_cmdline = (char *)TBOOT_KERNEL_CMDLINE_ADDR;
 
 /* MLE/kernel shared data page (in boot.S) */
 extern tboot_shared_t _tboot_shared;

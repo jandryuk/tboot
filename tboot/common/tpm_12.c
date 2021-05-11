@@ -1027,6 +1027,8 @@ static uint32_t _tpm12_wrap_seal(uint32_t locality,
 static uint32_t _tpm12_wrap_unseal(uint32_t locality, const uint8_t *in_data,
                                  uint32_t *secret_size, uint8_t *secret)
 {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     uint32_t ret;
     tpm_nonce_t odd_osap, even_osap;
     tpm_nonce_t nonce_even, nonce_odd, nonce_even_d, nonce_odd_d;
@@ -1099,6 +1101,7 @@ static uint32_t _tpm12_wrap_unseal(uint32_t locality, const uint8_t *in_data,
     /* skip check for res_auth */
 
     return ret;
+#pragma GCC diagnostic pop
 }
 
 static bool init_pcr_info(uint32_t locality,
@@ -1933,6 +1936,8 @@ static bool tpm12_get_random(struct tpm_if *ti, uint32_t locality,
 
 static bool tpm12_cap_pcrs(struct tpm_if *ti, u32 locality, int pcr)
 {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     bool was_capped[TPM_NR_PCRS] = {false};
     tpm_pcr_value_t cap_val;   /* use whatever val is on stack */
 
@@ -1961,6 +1966,7 @@ static bool tpm12_cap_pcrs(struct tpm_if *ti, u32 locality, int pcr)
 
     printk(TBOOT_INFO"cap'ed dynamic PCRs\n");
     return true;
+#pragma GCC diagnostic pop
 }
 
 static bool tpm12_check(void)

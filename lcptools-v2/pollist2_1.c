@@ -480,7 +480,6 @@ Out: Nothing
         display_tpm20_signature_2_1("        ", sig, TPM_ALG_ECDSA);
         return;
     }
-    free(sig);
     return;
 }
 
