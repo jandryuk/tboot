@@ -124,14 +124,14 @@ typedef struct {
 typedef struct __packed {
     uuid_t      uuid;
     uint8_t     chipset_acm_type;
-    uint8_t     version;             /* currently 4 */
+    uint8_t     version;             /* currently 7 */
     uint16_t    length;
     uint32_t    chipset_id_list;
     uint32_t    os_sinit_data_ver;
     uint32_t    min_mle_hdr_ver;
     txt_caps_t  capabilities;
     uint8_t     acm_ver;
-    uint8_t     reserved[3];
+    uint8_t     acm_revision[3];
     /* versions >= 4 */
     uint32_t    processor_id_list;
     /* versions >= 5 */

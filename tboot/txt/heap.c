@@ -418,7 +418,7 @@ static void print_bios_data(const bios_data_t *bios_data, uint64_t size)
            bios_data->lcp_pd_size);
     printk(TBOOT_DETA"\t num_logical_procs: %u\n", bios_data->num_logical_procs);
     if ( bios_data->version >= 3 )
-        printk(TBOOT_DETA"\t flags: 0x%08jx\n", bios_data->flags);
+        printk(TBOOT_DETA"\t flags: 0x%08jx\n", bios_data->flags.raw);
     if ( bios_data->version >= 4 && size > sizeof(*bios_data) + sizeof(size) )
         print_ext_data_elts(bios_data->ext_data_elts);
 }
@@ -617,7 +617,7 @@ bool verify_bios_data(const txt_heap_t *txt_heap)
         return false;
     }
     /* we assume backwards compatibility but print a warning */
-    if ( bios_data->version > 4 )
+    if ( bios_data->version > 6 )
         printk(TBOOT_WARN"unsupported BIOS data version (%u)\n", bios_data->version);
 
     /* all TXT-capable CPUs support at least 1 core */

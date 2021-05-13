@@ -244,14 +244,32 @@ typedef struct {
 /*
  * BIOS structure
  */
+
+#define PLATFORM_TYPE_CLIENT 0x01
+#define PLATFORM_TYPE_SERVER 0x02
+
 typedef struct __packed {
-    uint32_t  version;              /* currently 2-4 */
+    uint32_t sinit;
+    struct {
+        /* versions >= 5 */
+        uint32_t ppi_supported : 1;
+        /* versions >= 6 */
+        uint32_t platform_type : 2;
+        uint32_t reserved      : 29;
+    } mle;
+} bios_data_flags_t;
+
+typedef struct __packed {
+    uint32_t  version;              /* currently 2-6 */
     uint32_t  bios_sinit_size;
     uint64_t  lcp_pd_base;
     uint64_t  lcp_pd_size;
     uint32_t  num_logical_procs;
     /* versions >= 3 */
-    uint64_t  flags; /* For TPM2, it is divided into sinit_flag and mle_flag */
+    union {
+        uint64_t raw;
+        bios_data_flags_t bits; /* For TPM2, it is divided into sinit_flag and mle_flag */
+    } flags;
     /* versions >= 4 */
     heap_ext_data_element_t  ext_data_elts[];
 } bios_data_t;

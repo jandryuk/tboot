@@ -52,6 +52,7 @@
 #include <txt/mtrrs.h>
 #include <txt/heap.h>
 #include <txt/smx.h>
+#include <txt/heap.h>
 #include <tpm.h>
 #endif    /* IS_INCLUDED */
 
@@ -359,6 +360,12 @@ static void print_acm_hdr(const acm_hdr_t *hdr, const char *mod_name)
     printk(TBOOT_DETA"\t\t min_mle_hdr_ver: 0x%08x\n", info_table->min_mle_hdr_ver);
     print_txt_caps("\t\t ", info_table->capabilities);
     printk(TBOOT_DETA"\t\t acm_ver: %u\n", (uint32_t)info_table->acm_ver);
+    if (info_table->version > 6) {
+        printk(TBOOT_DETA"\t\t acm_revision: %x.%x.%x\n",
+               (uint32_t)info_table->acm_revision[0],
+               (uint32_t)info_table->acm_revision[1],
+               (uint32_t)info_table->acm_revision[2]);
+    }
 
     /* chipset list */
     printk(TBOOT_DETA"\t chipset list:\n");
@@ -524,7 +531,7 @@ static bool is_acmod(const void *acmod_base, uint32_t acmod_size, uint8_t *type,
         return false;
     }
     /* there is forward compatibility, so this is just a warning */
-    else if ( info_table->version > 5 ) {
+    else if ( info_table->version > 7 ) {
         if ( !quiet )
             printk(TBOOT_WARN"\t ACM info_table version mismatch (%u)\n",
                    (uint32_t)info_table->version);
@@ -575,6 +582,27 @@ bool does_acmod_match_platform(const acm_hdr_t* hdr)
     static bool printed_host_info;
 
     /* this fn assumes that the ACM has already passed the is_acmod() checks */
+    acm_info_table_t *info_table = get_acmod_info_table(hdr);
+    if ( info_table == NULL )
+        return false;
+
+    /* verify client/server platform match */
+    txt_heap_t *txt_heap = get_txt_heap();
+    bios_data_t *bios_data = get_bios_data_start(txt_heap);
+    if (info_table->version >= 5 && bios_data->version >= 6) {
+        uint32_t bios_type = bios_data->flags.bits.mle.platform_type;
+        uint32_t sinit_type = info_table->capabilities.platform_type;
+
+        if (bios_type == PLATFORM_TYPE_CLIENT && sinit_type != PLATFORM_TYPE_CLIENT) {
+            printk(TBOOT_ERR"Error: Non-client ACM on client platform\n");
+            return false;
+        }
+
+        if (bios_type == PLATFORM_TYPE_SERVER && sinit_type != PLATFORM_TYPE_SERVER) {
+            printk(TBOOT_ERR"Error: Non-server ACM on server platform\n");
+            return false;
+        }
+    }
 
     /* get chipset fusing, device, and vendor id info */
     txt_didvid_t didvid;
@@ -641,10 +669,6 @@ bool does_acmod_match_platform(const acm_hdr_t* hdr)
     /*
      * check if processor family/model/stepping and platform IDs match
      */
-    acm_info_table_t *info_table = get_acmod_info_table(hdr);
-    if ( info_table == NULL )
-        return false;
-
     if ( info_table->version >= 4 ) {
         acm_processor_id_list_t *proc_id_list = get_acmod_processor_list(hdr);
         if ( proc_id_list == NULL )

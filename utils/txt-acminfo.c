@@ -47,16 +47,21 @@
 #include <sys/user.h>
 #include <fcntl.h>
 
+typedef uint8_t mtrr_state_t;
+typedef uint8_t multiboot_info_t;
+
 #define printk   printf
 #include "../include/config.h"
 #include "../include/uuid.h"
 #include "../include/mle.h"
+#include "../include/hash.h"
 #include "../tboot/include/compiler.h"
 #include "../tboot/include/processor.h"
 #include "../tboot/include/misc.h"
 #include "../tboot/include/io.h"
 #include "../tboot/include/txt/acmod.h"
 #include "../tboot/include/txt/config_regs.h"
+#include "../tboot/include/txt/heap.h"
 
 /* override of fn. that will be called by verify_acmod() */
 typedef struct {
@@ -101,7 +106,6 @@ static void *pub_config_base;
 #define read_pub_config_reg(reg)   *(volatile uint64_t *)(pub_config_base + \
                                                           reg);
 #define MIN_OS_SINIT_DATA_VER 4
-#define MAX_OS_SINIT_DATA_VER 6
 
 #define IS_INCLUDED    /* prevent acmod.c #include */
 #include "../tboot/txt/acmod.c"
