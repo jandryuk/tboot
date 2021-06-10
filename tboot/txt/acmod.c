@@ -115,13 +115,13 @@ static acm_chipset_id_list_t *get_acmod_chipset_list(const acm_hdr_t* hdr)
     size = hdr->size * 4;
 
     /* overflow? */
-    if ( plus_overflow_u32(id_list_off, sizeof(acm_chipset_id_t)) ) {
-        printk(TBOOT_ERR"id_list_off plus acm_chipset_id_t size overflows\n");
+    if ( plus_overflow_u32(id_list_off, sizeof(acm_chipset_id_list_t)) ) {
+        printk(TBOOT_ERR"id_list_off plus acm_chipset_id_list_t size overflows\n");
         return NULL;
     }
 
     /* check that chipset id table is w/in ACM */
-    if ( id_list_off + sizeof(acm_chipset_id_t) > size ) {
+    if ( id_list_off + sizeof(acm_chipset_id_list_t) > size ) {
         printk(TBOOT_ERR"ACM chipset id list is too big: chipset_id_list=%x\n",
                id_list_off);
         return NULL;
@@ -142,14 +142,14 @@ static acm_chipset_id_list_t *get_acmod_chipset_list(const acm_hdr_t* hdr)
         printk(TBOOT_ERR"size of acm_chipset_id_list overflows\n");
         return NULL;
     }
-    if ( plus_overflow_u32(id_list_off + sizeof(acm_chipset_id_t),
+    if ( plus_overflow_u32(id_list_off + sizeof(acm_chipset_id_list_t),
         chipset_id_list->count * sizeof(acm_chipset_id_t)) ) {
         printk(TBOOT_ERR"size of all entries overflows\n");
         return NULL;
     }
 
     /* check that all entries are w/in ACM */
-    if ( id_list_off + sizeof(acm_chipset_id_t) +
+    if ( id_list_off + sizeof(acm_chipset_id_list_t) +
          chipset_id_list->count * sizeof(acm_chipset_id_t) > size ) {
         printk(TBOOT_ERR"ACM chipset id entries are too big:"
                " chipset_id_list->count=%x\n", chipset_id_list->count);
@@ -175,13 +175,13 @@ static acm_processor_id_list_t *get_acmod_processor_list(const acm_hdr_t* hdr)
     size = hdr->size * 4;
 
     /* overflow? */
-    if ( plus_overflow_u32(id_list_off, sizeof(acm_processor_id_t)) ) {
-        printk(TBOOT_ERR"id_list_off plus acm_processor_id_t size overflows\n");
+    if ( plus_overflow_u32(id_list_off, sizeof(acm_processor_id_list_t)) ) {
+        printk(TBOOT_ERR"id_list_off plus acm_processor_id_list_t size overflows\n");
         return NULL;
     }
 
     /* check that processor id table is w/in ACM */
-    if ( id_list_off + sizeof(acm_processor_id_t) > size ) {
+    if ( id_list_off + sizeof(acm_processor_id_list_t) > size ) {
         printk(TBOOT_ERR"ACM processor id list is too big: processor_id_list=%x\n",
                id_list_off);
         return NULL;
@@ -202,14 +202,14 @@ static acm_processor_id_list_t *get_acmod_processor_list(const acm_hdr_t* hdr)
         printk(TBOOT_ERR"size of acm_processor_id_list overflows\n");
         return NULL;
     }
-    if ( plus_overflow_u32(id_list_off + sizeof(acm_processor_id_t),
+    if ( plus_overflow_u32(id_list_off + sizeof(acm_processor_id_list_t),
         proc_id_list->count * sizeof(acm_processor_id_t)) ) {
         printk(TBOOT_ERR"size of all entries overflows\n");
         return NULL;
     }
 
     /* check that all entries are w/in ACM */
-    if ( id_list_off + sizeof(acm_processor_id_t) +
+    if ( id_list_off + sizeof(acm_processor_id_list_t) +
          proc_id_list->count * sizeof(acm_processor_id_t) > size ) {
         printk(TBOOT_ERR"ACM processor id entries are too big:"
                " proc_id_list->count=%x\n", proc_id_list->count);
