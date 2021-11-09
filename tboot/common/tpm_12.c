@@ -1045,7 +1045,6 @@ static uint32_t _tpm12_wrap_unseal(uint32_t locality, const uint8_t *in_data,
                                  uint32_t *secret_size, uint8_t *secret)
 {
     uint32_t ret;
-    tpm_nonce_t odd_osap, even_osap;
     tpm_nonce_t nonce_even, nonce_odd, nonce_even_d, nonce_odd_d;
     tpm_authhandle_t hauth, hauth_d;
     tpm_authdata_t shared_secret;
@@ -1056,13 +1055,17 @@ static uint32_t _tpm12_wrap_unseal(uint32_t locality, const uint8_t *in_data,
     uint32_t ordinal = TPM_ORD_UNSEAL;
     tpm12_digest_t digest;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     /* skip generate nonce for odd_osap, just use the random value in stack */
+    tpm_nonce_t odd_osap, even_osap;
 
     /* establish a osap session */
     ret = tpm12_osap(locality, TPM_ET_SRK, TPM_KH_SRK, &odd_osap, &hauth,
                    &nonce_even, &even_osap);
     if ( ret != TPM_SUCCESS )
             return ret;
+#pragma GCC diagnostic pop
 
     /* calculate the shared secret
        shared-secret = HMAC(auth, even_osap || odd_osap) */
@@ -1949,6 +1952,8 @@ static bool tpm12_get_random(struct tpm_if *ti, uint32_t locality,
 static bool tpm12_cap_pcrs(struct tpm_if *ti, u32 locality, int pcr)
 {
     bool was_capped[TPM_NR_PCRS] = {false};
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
     tpm_pcr_value_t cap_val;   /* use whatever val is on stack */
 
     if ( ti == NULL )
@@ -1973,6 +1978,7 @@ static bool tpm12_cap_pcrs(struct tpm_if *ti, u32 locality, int pcr)
             was_capped[g_pre_k_s3_state.vl_entries[i].pcr] = true;
         }
     }
+#pragma GCC diagnostic pop
 
     printk(TBOOT_INFO"cap'ed dynamic PCRs\n");
     return true;
