@@ -543,7 +543,10 @@ static bool adjust_kernel_cmdline(loader_ctx *lctx,
 
         tb_snprintf(new_cmdline, TBOOT_KERNEL_CMDLINE_SIZE, "%s tboot=%p",
                  old_cmdline, tboot_shared_addr);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
         new_cmdline[TBOOT_KERNEL_CMDLINE_SIZE - 1] = '\0';
+#pragma GCC diagnostic pop
 
         if (lctx->type == MB1_ONLY){
             /* multiboot 1 */
