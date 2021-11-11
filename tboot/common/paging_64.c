@@ -157,7 +157,8 @@ void jump_pe_image(void)
      "lgdtl %[gdt]\n"
 
     // Enable PAE
-     "mov %[cr4], %%eax\n"
+     "mov %%cr4, %%eax\n"
+     "or  %[cr4], %%eax\n"
      "mov %%eax, %%cr4\n"
 
     // Load our page tables
@@ -206,7 +207,7 @@ void jump_pe_image(void)
      [lme] "i" (1 << _EFER_LME),
      [cr0_nopg] "i" (CR0_PE | CR0_MP | CR0_NE),
      [cr0] "i" (CR0_PE | CR0_MP | CR0_NE | CR0_PG),
-     [cr4] "i" (CR4_DE | CR4_PAE | CR4_MCE | CR4_FXSR | CR4_XMM | CR4_SMXE),
+     [cr4] "i" ( CR4_PAE ),
      [ds64] "i" (__BOOT_DS64),
      [cs64] "i" (__BOOT_CS64),
      "S" (&pe_data)
