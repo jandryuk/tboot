@@ -1401,6 +1401,9 @@ bool launch_kernel(bool is_measured_launch)
             printk(TBOOT_ERR"CRB workaround failed \n");
     }
 
+    /* remove all SINIT and LCP modules since kernel may not handle */
+    remove_txt_modules(g_ldr_ctx);
+
     /* if using memory logging, reserve log area */
     if ( g_log_targets & TBOOT_LOG_TARGET_MEMORY ) {
         uint64_t base = TBOOT_SERIAL_LOG_ADDR;
@@ -1423,9 +1426,6 @@ bool launch_kernel(bool is_measured_launch)
 
     if ( !verify_loader_context(g_ldr_ctx) )
         return false;
-
-    /* remove all SINIT and LCP modules since kernel may not handle */
-    remove_txt_modules(g_ldr_ctx);
 
     module_t *m = get_module(g_ldr_ctx,0);
 
